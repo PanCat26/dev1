@@ -2,7 +2,7 @@
 
 ## Summary
 
-This RFC proposes a repo-aware coding assistant for Python Git codebases that can ingest a repository and its accompanying technical documentation, then support users through a chat-based interface. The assistant is intended to answer repository-specific questions based on the current codebase and docs, helping users understand project structure and behavior, locate relevant components (including likely sources of bugs), and suggest relevant fixes when appropriate. To support this, the system should combine a language model with retrieval over the active repository and documentation, so that responses remain tied to the actual project rather than relying only on generic pretrained knowledge. The proposed solution should also support ingestion of new repositories and include a lightweight human feedback loop, such as like/dislike feedback on responses.
+This RFC proposes a repo-aware coding assistant for Python Git codebases that can ingest a repository and its accompanying technical documentation, then support users through a chat-based interface. The assistant is intended to answer repository-specific questions based on the current codebase and docs, helping users understand project structure and behavior, locate relevant components (including likely sources of bugs), and suggest relevant fixes when appropriate. To support this, the system should combine a language model with retrieval over the active repository and documentation, so that responses remain tied to the actual project rather than relying only on generic pretrained knowledge. The proposed solution should also support ingestion of new repositories and include a lightweight human feedback loop based on pairwise answer selection.
 
 ## Goals
 
@@ -62,17 +62,14 @@ The system should include an agentic component, rather than using only a single 
 
 A practical design is to implement the assistant as a small workflow with several stages: query analysis, retrieval, optional tool use, answer generation, and answer verification. This can be implemented with a simple controller in the backend, or with a lightweight orchestration library if desired. The important point is that the workflow remains bounded and predictable.
 
-The initial tool set should remain small and repository-specific. Useful tools include:
+The initial tool set should remain small and repository-specific. The main tools are:
 
 - `list_files(path_prefix=None)` to inspect the repository tree
 - `open_file(file_path, start_line=None, end_line=None)` to read exact regions from the stored repository snapshot
 - `search_code(query)` to search code text for exact names, strings, or identifiers
-- `search_docs(query)` to search documentation text
 - `symbol_lookup(name)` to locate a class or function definition in the repository
-- `find_references(symbol_name)` to locate simple usages of a symbol across files
-- `suggest_patch(target_file, instruction)` to draft a possible fix for a specific file
 
-A typical workflow for a harder question should be: retrieve likely chunks from Qdrant, inspect the most relevant file or code region in the stored repository snapshot, optionally inspect one or two related files, and then compose the answer. For bug-related questions, the system can follow a more specific pattern: identify likely files, inspect the relevant definitions, inspect nearby usages or configuration, and only then explain the likely cause. If enough evidence is found, the assistant may also propose a draft fix.
+A typical workflow for a harder question should be: retrieve likely chunks from Qdrant, inspect the most relevant file or code region in the stored repository snapshot, optionally inspect one or two related files, and then compose the answer. As an optional extension, the system may also support bug-oriented assistance. In this case, for bug-related questions, the assistant could identify likely files, inspect the relevant definitions, inspect nearby usages or configuration, and then explain the likely cause. If enough evidence is found, it may also propose a draft fix.
 
 To keep the system manageable, the first version should avoid unrestricted tool use. The agent should be limited to a small number of steps, for example two or three retrieval or inspection rounds before producing an answer. This keeps latency reasonable and makes the system easier to evaluate.
 
@@ -98,7 +95,7 @@ The evaluation should be kept lightweight and should focus primarily on whether 
 
 The automatic evaluation set should be created from repositories that are not used during supervised fine-tuning. For each held-out repository, the backend should parse Python files using the `ast` module and extract symbols such as functions and classes, and optionally selected identifiers or constants. From these extracted elements, the system should generate simple template-based questions such as “Where is `FUNCTION_NAME` defined?”, “In which file is `CLASS_NAME` defined?”, or “Where is `IDENTIFIER` used?”. Since the correct file path, and in many cases the correct line range, are already known from parsing, the gold answers can be generated automatically.
 
-The main quantitative metrics should be **Top-1 accuracy**, **Recall@3**, and **Recall@5**. Top-1 accuracy measures whether the correct file or chunk is the first retrieved result. Recall@3 and Recall@5 measure whether the correct result appears anywhere within the top 3 or top 5 retrieved results.
+The main quantitative metrics should be **Top-1 accuracy**, **Recall@3**, and **Recall@5*. Top-1 accuracy measures whether the correct file or chunk is the first retrieved result. Recall@3 and Recall@5 measure whether the correct result appears anywhere within the top 3 or top 5 retrieved results.
 
 This automatic evaluation should be complemented by a much smaller manual end-to-end check. A small set of broader repository questions, for example 10 to 20 questions in total, should be prepared and run through the full system. These questions can cover tasks such as explaining how a component works, locating a likely bug source, or suggesting a plausible draft fix. For these questions, it is sufficient to manually assess whether the answer is correct and whether it is grounded in the cited repository evidence.
 
@@ -110,12 +107,12 @@ Each answer should be linked to its supporting evidence. The backend should atta
 
 ### Development
 
-Development should proceed in three stages. First, an MVP should be built and tested locally: the Next.js frontend, FastAPI backend, PostgreSQL, Qdrant, and the repository-storage directory can run together in a simple development environment, while the fine-tuned model is served separately through vLLM’s OpenAI-compatible server. Second, once ingestion, retrieval, and chat are stable, the system should be tested on a small set of held-out Python repositories and the pairwise-feedback flow should be enabled so preference data can start being collected for later DPO tuning. Third, the project should be deployed in a simple cloud setup so that it can be accessed from any browser. A practical deployment stack for this stage is to host the Next.js frontend on Vercel, run the FastAPI backend on a small cloud VM or container service, use managed PostgreSQL and managed Qdrant, and host the vLLM server on a GPU-enabled machine.
+Development should proceed in two stages. First, an MVP should be built and tested locally: the Next.js frontend, FastAPI backend, PostgreSQL, Qdrant, and the repository-storage directory can run together in a simple development environment, while the fine-tuned model is served separately through vLLM’s OpenAI-compatible server. Second, once ingestion, retrieval, and chat are stable, the system should be tested on a small set of held-out Python repositories, and the pairwise-feedback flow should be enabled so preference data can start being collected for later DPO tuning.
 
 ### References
 
-1. **FastAPI** — [link](https://fastapi.tiangolo.com/)
-2. **vLLM** — [link](https://docs.vllm.ai/en/stable/)
-3. **Qdrant** — [link](https://qdrant.tech/documentation/)
-4. **PEFT (Parameter-Efficient Fine-Tuning)** — [link](https://huggingface.co/docs/peft)
-5. **OpenCodeInstruct** — [link](https://huggingface.co/datasets/nvidia/OpenCodeInstruct)
+1. **FastAPI** - [link](https://fastapi.tiangolo.com/)
+2. **vLLM** - [link](https://docs.vllm.ai/en/stable/)
+3. **Qdrant** - [link](https://qdrant.tech/documentation/)
+4. **PEFT (Parameter-Efficient Fine-Tuning)** - [link](https://huggingface.co/docs/peft)
+5. **OpenCodeInstruct** - [link](https://huggingface.co/datasets/nvidia/OpenCodeInstruct)
