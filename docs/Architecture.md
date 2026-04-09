@@ -26,7 +26,7 @@ From an architecture-documentation perspective, these map naturally to the follo
 
 This structure is consistent with typical LLM application architecture.
 
-> **Diagram placeholder:** diagrama mare gen ce mi-a aratat Teo
+![high-level-design](diagrams/highLevel.png)
 
 ## System components
 
@@ -197,7 +197,7 @@ When a user adds a repository, the backend creates a repository record, stores t
 
 This flow establishes the repository snapshot that all future answers must reference.
 
-> **Diagram placeholder:** diagrama ptr asta
+![repository-ingestion-and-indexing-flow](diagrams/repositoryFlow.png)
 
 ### 2. Query answering flow
 
@@ -207,13 +207,13 @@ The backend then assembles a structured evidence package and sends it to the mod
 
 If the retrieved evidence is insufficient, the backend should return an explicit insufficient-evidence response instead of generating a speculative answer.
 
-> **Diagram placeholder:** diagrama ptr asta
+![query-answering-flow](diagrams/queryAnswerFlow.png)
 
 ### 3. Evaluation flow
 
 The automatic evaluation service runs on held-out repositories. It parses the repositories, extracts symbols, creates template-based evaluation questions, and evaluates whether retrieval returns the correct file or chunk in the top ranked results. Metrics such as Top-1 accuracy, Recall@3, and Recall@5 are then reported.
 
-> **Diagram placeholder:** diagrama ptr asta
+![evaluation-flow](diagrams/evaluationFlow.png)
 
 ## Implementation plan
 
