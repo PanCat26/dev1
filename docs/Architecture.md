@@ -46,7 +46,7 @@ The frontend's role is to coordinate user interactions and render backend-provid
 
 The FastAPI backend acts as the central coordinator of the system. It exposes REST endpoints for repository and indexing operations and WebSocket endpoints for incremental answer streaming. Internally, the backend is organized into specialized components.
 
-> **Diagram placeholder:** diagrama mai mica doar cu backend-ul
+![backend-diagram](diagrams/backend.png)
 
 #### 2.1. Repository management service
 
@@ -146,8 +146,6 @@ To reduce compute requirements, fine-tuning will use **PEFT** (**QLoRA**), rathe
 ### 3. Data stores
 
 The system uses complementary data stores, each chosen for a distinct persistence concern.
-
-> **Diagram placeholder:** diagrama mica cu data store-urile (maybe)
 
 #### 3.1. PostgreSQL
 
