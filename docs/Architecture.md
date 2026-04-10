@@ -107,7 +107,8 @@ The orchestration service implements the bounded agentic behavior of the assista
 5. generate the answer;
 6. verify that the response remains tied to retrieved evidence.
 
-The first version should keep this workflow limited. The assistant should use an initial tool set of: 
+The first version should keep this workflow limited. The assistant should use an initial tool set of:
+
 - `list_files(path_prefix=None)`
 - `open_file(file_path, start_line=None, end_line=None)`
 - `search_code(query)`
@@ -216,22 +217,28 @@ The automatic evaluation service runs on held-out repositories. It parses the re
 ## Implementation plan
 
 ### Week 7
+
 - Backend and repository ingestion
 
 ### Week 8
+
 - Chunking, embeddings, and vector indexing
 
 ### Week 9
+
 - Retrieval and answer orchestration
 - vLLM integration
 
 ### Week 10
+
 - Frontend integration
 - Chat flow
 - Preference feedback flow
 
 ### Week 11
+
 - Evaluation and system checks
 
 ### Week 12
+
 - Demo, presentation, and final validation
