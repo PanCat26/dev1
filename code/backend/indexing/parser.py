@@ -38,7 +38,7 @@ def parse_python_file(path: str) -> list[ParsedSymbol]:
                 symbol_type="function",
                 start_line=node.lineno,
                 end_line=node.end_lineno or node.lineno,
-                source=_extract_source(lines, node.lineno, node.end_lineno or node.lineno),
+                text=_extract_source(lines, node.lineno, node.end_lineno or node.lineno),
             ))
 
         elif isinstance(node, ast.ClassDef):
@@ -49,7 +49,7 @@ def parse_python_file(path: str) -> list[ParsedSymbol]:
                 symbol_type="class",
                 start_line=node.lineno,
                 end_line=class_end,
-                source=_extract_source(lines, node.lineno, class_end),
+                text=_extract_source(lines, node.lineno, class_end),
             ))
 
             # Extract methods inside the class
@@ -61,7 +61,7 @@ def parse_python_file(path: str) -> list[ParsedSymbol]:
                         symbol_type="method",
                         start_line=item.lineno,
                         end_line=item.end_lineno or item.lineno,
-                        source=_extract_source(lines, item.lineno, item.end_lineno or item.lineno),
+                        text=_extract_source(lines, item.lineno, item.end_lineno or item.lineno),
                     ))
 
     return symbols

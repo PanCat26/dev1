@@ -9,4 +9,17 @@ class ParsedSymbol:
     symbol_type: str  # "function", "class", "method"
     start_line: int
     end_line: int
-    source: str
+    text: str
+
+
+@dataclass
+class Chunk:
+    """A text chunk ready for embedding and storage."""
+    repo_id: str
+    commit_sha: str
+    file_path: str
+    chunk_type: str  # "function", "class", "method", "doc_section"
+    symbol_name: str
+    start_line: int
+    end_line: int
+    text: str
