@@ -74,9 +74,9 @@ QDRANT_DISTANCE_METRIC=Cosine
 EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
 ```
 
-All variables have sensible defaults, so `.env` is optional for local development.
+All variables have defaults, so `.env` is optional for local development.
 
-## Start Qdrant (Docker)
+## Start Qdrant
 
 ```bash
 docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
@@ -94,12 +94,19 @@ python scripts/create_qdrant_collection.py
 
 This creates the collection configured in your `.env` (or uses defaults).
 
-## Scan and parse a repository snapshot
+## Run the indexing pipeline
 
-To scan a directory for supported files and extract Python symbols:
+Make sure Qdrant is running and the collection is created (see above), then:
 
 ```bash
-python scripts/run_scanning_demo.py <path-to-repo-snapshot>
+python scripts/run_indexing_demo.py <snapshot_path> [repo_id] [commit_sha]
 ```
 
-If no path is given it scans `code/backend/` itself as an example:
+Example indexing the backend itself:
+
+```bash
+python scripts/run_indexing_demo.py . my-repo abc1234
+```
+
+The script prints a result summary with file count, chunk count, and any errors.
+You can verify the data in the Qdrant dashboard at http://localhost:6333/dashboard.
