@@ -93,3 +93,13 @@ python scripts/create_qdrant_collection.py
 ```
 
 This creates the collection configured in your `.env` (or uses defaults).
+
+## Scan and parse a repository snapshot
+
+To scan a directory for supported files and extract Python symbols:
+
+```bash
+python scripts/run_scanning_demo.py <path-to-repo-snapshot>
+```
+
+If no path is given it scans `code/backend/` itself as an example:
