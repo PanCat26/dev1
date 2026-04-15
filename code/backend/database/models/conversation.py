@@ -13,3 +13,4 @@ class Conversation(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     repository = relationship("Repository")
+    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")

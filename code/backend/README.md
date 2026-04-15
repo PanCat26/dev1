@@ -98,6 +98,14 @@ With the virtual environment activated and PostgreSQL running, apply database mi
 alembic upgrade head
 ```
 
+## Generate a New Database Migration (Alembic)
+
+After making any changes to the SQLAlchemy models located in `database/models/`, generate a new migration script using the autogeneration feature:
+```bash
+alembic revision --autogenerate -m "Your descriptive message here"
+```
+Then run the `alembic upgrade head` command shown above to apply it.
+
 ## Create the Qdrant collection
 
 With the virtual environment activated and Qdrant running:
