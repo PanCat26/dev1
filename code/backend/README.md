@@ -79,7 +79,7 @@ All variables have defaults, so `.env` is optional for local development.
 ## Start Qdrant
 
 ```bash
-docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant
+docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant:v1.13.2
 ```
 
 Qdrant dashboard will be available at http://localhost:6333/dashboard.

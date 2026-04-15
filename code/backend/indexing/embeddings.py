@@ -1,14 +1,19 @@
+import threading
+
 from sentence_transformers import SentenceTransformer
 import config
 
 _model: SentenceTransformer | None = None
+_model_lock = threading.Lock()
 
 
 def _get_model() -> SentenceTransformer:
     """Load the embedding model"""
     global _model
     if _model is None:
-        _model = SentenceTransformer(config.EMBEDDING_MODEL_NAME)
+        with _model_lock:
+            if _model is None:
+                _model = SentenceTransformer(config.EMBEDDING_MODEL_NAME)
     return _model
 
 
