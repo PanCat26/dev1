@@ -1,10 +1,10 @@
 from sqlalchemy.orm import Session
 import uuid
-from database.models.repository import Repository
-from database.models.conversation import Conversation
+from repository_management.models.repository import Repository
+from repository_management.models.conversation import Conversation
 from typing import List, Optional
 
-def create_repository(db: Session, name: str, github_url: str, default_branch: str, snapshot_path: str, commit_sha: str = None) -> Repository:
+def create_repository(db: Session, name: str, github_url: str, default_branch: str, snapshot_path: str, commit_sha: str) -> Repository:
     db_repo = Repository(
         name=name,
         github_url=github_url,

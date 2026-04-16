@@ -73,6 +73,7 @@ QDRANT_VECTOR_SIZE=384
 QDRANT_DISTANCE_METRIC=Cosine
 EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
 DATABASE_URL=postgresql://dev1:dev1@127.0.0.1:5433/dev1db
+GITHUB_TOKEN=
 ```
 
 All variables have defaults, so `.env` is optional for local development.

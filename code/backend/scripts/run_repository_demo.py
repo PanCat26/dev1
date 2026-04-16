@@ -4,9 +4,9 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from database.session import get_db
-from services.repository_manager import add_repository
-from database.crud.repository import get_repository
+from repository_management.session import get_db
+from repository_management.repository_manager import add_repository
+from repository_management.repository import get_repository
 
 def main():
     if len(sys.argv) < 2:

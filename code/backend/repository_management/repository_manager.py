@@ -1,14 +1,14 @@
 import os
 import shutil
 import threading
-from typing import Optional, Tuple
+from typing import Tuple
 import uuid
 
 from config import SNAPSHOTS_DIR, GITHUB_TOKEN
-from database.session import SessionLocal
-from database.crud import repository as crud_repository
+from repository_management.session import SessionLocal
+from repository_management.repository import create_repository, get_repository, update_repository_status
 from indexing.service import run_indexing
-from .github import fetch_github_metadata, download_and_extract_zip
+from repository_management.github_utils import fetch_github_metadata, download_and_extract_zip
 
 def _async_index_task(repo_id: uuid.UUID, commit_sha: str, snapshot_path: str):
     """Runs the indexing pipeline in the background and updates the repository status."""
@@ -19,14 +19,14 @@ def _async_index_task(repo_id: uuid.UUID, commit_sha: str, snapshot_path: str):
         
         if result.errors:
             print(f"[{repo_id}] Indexing finished with errors.")
-            crud_repository.update_repository_status(db, repo_id, "failed")
+            update_repository_status(db, repo_id, "failed")
         else:
             print(f"[{repo_id}] Indexing completed successfully.")
-            crud_repository.update_repository_status(db, repo_id, "ready")
+            update_repository_status(db, repo_id, "ready")
         db.commit()
     except Exception as e:
         print(f"[{repo_id}] Exception during indexing: {e}")
-        crud_repository.update_repository_status(db, repo_id, "failed")
+        update_repository_status(db, repo_id, "failed")
         db.commit()
     finally:
         db.close()
@@ -42,7 +42,7 @@ def add_repository(db_session, github_link: str) -> Tuple[uuid.UUID, str, str, s
 
     name, default_branch, commit_sha = fetch_github_metadata(owner, repo_name)
     
-    repo = crud_repository.create_repository(
+    repo = create_repository(
         db=db_session, 
         name=name, 
         github_url=github_link,
@@ -75,7 +75,7 @@ def add_repository(db_session, github_link: str) -> Tuple[uuid.UUID, str, str, s
 
 def retry_indexing(db_session, repo_id: uuid.UUID):
     """Retries indexing for an existing repository."""
-    repo = crud_repository.get_repository(db_session, repo_id)
+    repo = get_repository(db_session, repo_id)
     if not repo:
         raise ValueError(f"Repository {repo_id} not found.")
     
@@ -94,7 +94,7 @@ def retry_indexing(db_session, repo_id: uuid.UUID):
 
 def refresh_repository(db_session, repo_id: uuid.UUID) -> bool:
     """Pulls the latest changes (if any) and reindexes the repository."""
-    repo = crud_repository.get_repository(db_session, repo_id)
+    repo = get_repository(db_session, repo_id)
     if not repo:
         raise ValueError(f"Repository {repo_id} not found.")
         

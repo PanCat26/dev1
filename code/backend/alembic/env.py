@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from config import DATABASE_URL
-from database.models import Base
+from repository_management.models import Base
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

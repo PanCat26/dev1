@@ -11,7 +11,7 @@ class Repository(Base):
     name = Column(String, nullable=False)
     github_url = Column(String, nullable=False)
     default_branch = Column(String, nullable=False)
-    commit_sha = Column(String, nullable=True)
+    commit_sha = Column(String, nullable=False)
     snapshot_path = Column(String, nullable=False)
     status = Column(String, nullable=False, default="indexing")
     created_at = Column(DateTime, default=datetime.utcnow)
