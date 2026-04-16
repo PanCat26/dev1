@@ -139,13 +139,13 @@ You can verify the data in the Qdrant dashboard at http://localhost:6333/dashboa
 This script demonstrates the full ingestion pipeline: it creates a new database entry, snapshots the target directory to local storage, and then automatically kicks off the asynchronous indexing pipeline.
 
 ```bash
-python scripts/run_repository_demo.py <source_path> <repo_name> [commit_sha]
+python scripts/run_repository_demo.py <github_url>
 ```
 
 Example analyzing the backend directory:
 
 ```bash
-python scripts/run_repository_demo.py . my-repo abc1234
+python scripts/run_repository_demo.py https://github.com/antoniunegrea/Task-Management
 ```
 
 This will:
