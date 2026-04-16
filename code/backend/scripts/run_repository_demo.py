@@ -1,45 +1,42 @@
 import sys
 import os
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from database.session import SessionLocal
-from services.repository_manager import RepositoryManager
-import time
-
+from database.session import get_db
+from services.repository_manager import add_repository
+from database.crud.repository import get_repository
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: python scripts/run_repository_demo.py <source_path> <repo_name> [commit_sha]")
-        print("Example: python scripts/run_repository_demo.py ../../../some-repo my-repo abc1234")
+    if len(sys.argv) < 2:
+        print("Usage: python scripts/run_repository_demo.py <github_url>")
+        print("Example: python scripts/run_repository_demo.py https://github.com/fastapi/fastapi")
         sys.exit(1)
 
-    source_path = sys.argv[1]
-    repo_name = sys.argv[2]
-    commit_sha = sys.argv[3] if len(sys.argv) > 3 else "unknown"
+    github_url = sys.argv[1]
+    
+    print(f"Adding repository from GitHub: {github_url}")
 
-    print(f"Adding local repository: {repo_name} from {os.path.abspath(source_path)}")
-
-    # Initialize a local DB session
-    db = SessionLocal()
+    db = next(get_db())
     try:
-        repo = RepositoryManager.add_local_repository(
+        repo_id, default_branch, commit_sha, name = add_repository(
             db_session=db,
-            name=repo_name,
-            source_path=source_path,
-            commit_sha=commit_sha
+            github_link=github_url
         )
-        print(f"\nSuccessfully stored repository snapshot and triggered indexing!")
-        print(f"Repo ID: {repo.id}")
-        print(f"Status: {repo.status}")
-        print(f"Snapshot Location: {repo.snapshot_path}")
-
-        print("\nWaiting for background indexing to complete (so we can print final status)...")
-        # Polling DB to see when status changes from 'indexing'
+        print(f"\nSuccessfully downloaded and triggered indexing!")
+        print(f"Repo ID: {repo_id}")
+        print(f"Name: {name}")
+        print(f"Branch: {default_branch}")
+        print(f"Commit: {commit_sha}")
+        
+        print("\nWaiting for background indexing to complete...")
         while True:
-            db.refresh(repo)
+            # Need to commit or expire to clear session cache in loop
+            db.commit()
+            repo = get_repository(db, repo_id)
             if repo.status != "indexing":
-                print(f"Indexing finished. Final status: {repo.status}")
+                print(f"\nIndexing finished. Final status: {repo.status}")
                 break
             time.sleep(2)
             print(".", end="", flush=True)

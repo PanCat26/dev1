@@ -9,6 +9,8 @@ class Repository(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
+    github_url = Column(String, nullable=False)
+    default_branch = Column(String, nullable=False)
     commit_sha = Column(String, nullable=True)
     snapshot_path = Column(String, nullable=False)
     status = Column(String, nullable=False, default="indexing")
