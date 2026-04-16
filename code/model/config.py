@@ -16,7 +16,7 @@ DEFAULT_MERGED_OUTPUT = os.path.join(DEFAULT_OUTPUT_DIR, "merged")
 class QLoRAConfig:
     """QLoRA adapter hyper-parameters."""
 
-    lora_r: int = 64
+    lora_r: int = 32
     lora_alpha: int = 16
     lora_dropout: float = 0.05
     target_modules: list[str] = field(
