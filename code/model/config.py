@@ -16,7 +16,7 @@ DEFAULT_MERGED_OUTPUT = os.path.join(DEFAULT_OUTPUT_DIR, "merged")
 class QLoRAConfig:
     """QLoRA adapter hyper-parameters."""
 
-    lora_r: int = 32
+    lora_r: int = 16
     lora_alpha: int = 16
     lora_dropout: float = 0.05
     target_modules: list[str] = field(
@@ -25,9 +25,6 @@ class QLoRAConfig:
             "k_proj",
             "v_proj",
             "o_proj",
-            "gate_proj",
-            "up_proj",
-            "down_proj",
         ]
     )
     task_type: str = "CAUSAL_LM"
@@ -54,15 +51,15 @@ class SFTRunConfig:
     learning_rate: float = 2e-4
     lr_scheduler_type: str = "cosine"
     warmup_ratio: float = 0.03
-    max_seq_length: int = 2048
+    max_seq_length: int = 1024
     fp16: bool = False
     bf16: bool = True
-    logging_steps: int = 25
-    save_steps: int = 250
+    logging_steps: int = 100
+    save_steps: int = 1000
     save_total_limit: int = 3
     seed: int = 42
     output_dir: str = DEFAULT_SFT_OUTPUT
-    gradient_checkpointing: bool = True
+    gradient_checkpointing: bool = False
     optim: str = "paged_adamw_8bit"
     report_to: str = "none"
-    max_train_samples: Optional[int] = None
+    max_train_samples: Optional[int] = 50000

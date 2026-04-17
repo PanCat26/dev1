@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import math
 import os
 
 import torch
@@ -9,9 +9,8 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    TrainingArguments,
 )
-from trl import SFTTrainer
+from trl import SFTConfig, SFTTrainer
 
 from config import (
     BASE_MODEL_ID,
@@ -19,10 +18,7 @@ from config import (
     QLoRAConfig,
     SFTRunConfig,
 )
-from data import load_sft_dataset
-
-
-logger = logging.getLogger(__name__)
+from data import get_train_num_examples, load_sft_dataset
 
 
 def _build_bnb_config(cfg: BnBCfg) -> BitsAndBytesConfig:
@@ -46,8 +42,25 @@ def _build_lora_config(cfg: QLoRAConfig) -> LoraConfig:
     )
 
 
-def _build_training_args(cfg: SFTRunConfig) -> TrainingArguments:
-    return TrainingArguments(
+def _resolve_max_steps(cfg: SFTRunConfig) -> int:
+    total_examples = (
+        cfg.max_train_samples
+        if cfg.max_train_samples is not None
+        else get_train_num_examples()
+    )
+
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    effective_batch_size = (
+        cfg.per_device_train_batch_size
+        * cfg.gradient_accumulation_steps
+        * world_size
+    )
+
+    return math.ceil(cfg.num_train_epochs * total_examples / effective_batch_size)
+
+
+def _build_training_args(cfg: SFTRunConfig) -> SFTConfig:
+    return SFTConfig(
         output_dir=cfg.output_dir,
         num_train_epochs=cfg.num_train_epochs,
         per_device_train_batch_size=cfg.per_device_train_batch_size,
@@ -55,6 +68,7 @@ def _build_training_args(cfg: SFTRunConfig) -> TrainingArguments:
         learning_rate=cfg.learning_rate,
         lr_scheduler_type=cfg.lr_scheduler_type,
         warmup_ratio=cfg.warmup_ratio,
+        max_steps=_resolve_max_steps(cfg),
         fp16=cfg.fp16,
         bf16=cfg.bf16,
         logging_steps=cfg.logging_steps,
@@ -64,23 +78,24 @@ def _build_training_args(cfg: SFTRunConfig) -> TrainingArguments:
         gradient_checkpointing=cfg.gradient_checkpointing,
         optim=cfg.optim,
         report_to=cfg.report_to,
+        max_length=cfg.max_seq_length,
     )
 
 
-def train():
+def train() -> None:
     """Run SFT."""
     run_cfg = SFTRunConfig()
     bnb_cfg = BnBCfg()
     qlora_cfg = QLoRAConfig()
 
     # tokenizer
-    logger.info("Loading tokenizer for %s", BASE_MODEL_ID)
+    print("Loading tokenizer for %s", BASE_MODEL_ID)
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_ID, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     # quantised base model
-    logger.info("Loading base model with 4-bit quantisation")
+    print("Loading base model with 4-bit quantisation")
     model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL_ID,
         quantization_config=_build_bnb_config(bnb_cfg),
@@ -95,28 +110,26 @@ def train():
     model.print_trainable_parameters()
 
     # dataset
-    dataset = load_sft_dataset(
-        max_samples=run_cfg.max_train_samples,
-    )
+    dataset = load_sft_dataset(max_samples=run_cfg.max_train_samples)
 
     # trainer
     training_args = _build_training_args(run_cfg)
+    print("Resolved max_steps=%s", training_args.max_steps)
     trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=dataset,
         processing_class=tokenizer,
-        max_seq_length=run_cfg.max_seq_length,
     )
 
-    logger.info("Starting SFT training")
+    print("Starting SFT training")
     trainer.train()
 
     # save adapter
     adapter_path = os.path.join(run_cfg.output_dir, "final_adapter")
     trainer.save_model(adapter_path)
     tokenizer.save_pretrained(adapter_path)
-    logger.info("Adapter saved to %s", adapter_path)
+    print("Adapter saved to %s", adapter_path)
 
 
 if __name__ == "__main__":

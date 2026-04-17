@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-import logging
 from typing import Optional
 
-from datasets import Dataset, load_dataset
+from datasets import IterableDataset, load_dataset, load_dataset_builder
 
 from config import SFT_DATASET
 
 
-logger = logging.getLogger(__name__)
-
-
 def _format_opencode_instruct(example: dict) -> dict:
-    """Convert an OpenCodeInstruct sample to a chat-template messages list.
-    """
+    """Convert an OpenCodeInstruct sample to a chat-template messages list."""
     instruction = example.get("input", "")
     response = example.get("output", "")
 
@@ -24,31 +19,29 @@ def _format_opencode_instruct(example: dict) -> dict:
     return {"messages": messages}
 
 
+def get_train_num_examples() -> int:
+    """Return the declared size of the train split."""
+    builder = load_dataset_builder(SFT_DATASET)
+    return builder.info.splits["train"].num_examples
+
+
 def load_sft_dataset(
     *,
     max_samples: Optional[int] = None,
-    streaming: bool = False,
-) -> Dataset:
-    """Load and format the SFT training dataset.
+) -> IterableDataset:
+    """Load and format the SFT dataset in streaming mode."""
+    print("Loading SFT dataset in streaming mode: %s", SFT_DATASET)
+    dataset = load_dataset(SFT_DATASET, split="train", streaming=True)
 
-    Parameters
-    ----------
-    max_samples:
-        Cap the total number of training rows. ``None`` means use the
-        full dataset.
-    streaming:
-        If ``True``, the dataset is loaded in streaming mode.
-    """
-    logger.info("Loading SFT dataset: %s", SFT_DATASET)
-    dataset = load_dataset(SFT_DATASET, split="train", streaming=streaming)
+    dataset = dataset.map(_format_opencode_instruct)
 
-    dataset = dataset.map(
-        _format_opencode_instruct,
-        remove_columns=dataset.column_names if not streaming else None,
+    if max_samples is not None:
+        dataset = dataset.take(max_samples)
+
+    print(
+        "SFT dataset ready - %s",
+        f"streaming (capped at {max_samples} samples)"
+        if max_samples is not None
+        else "streaming full dataset",
     )
-
-    if max_samples is not None and not streaming:
-        dataset = dataset.select(range(min(max_samples, len(dataset))))
-
-    logger.info("SFT dataset ready - %s samples", len(dataset) if not streaming else "streaming")
     return dataset
