@@ -1,9 +1,13 @@
 import os
 from dataclasses import dataclass, field
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 BASE_MODEL_ID = "Qwen/Qwen2.5-Coder-7B-Instruct"
+ADAPTER_REPO = os.getenv("ADAPTER_REPO")
 
 SFT_DATASET = "nvidia/OpenCodeInstruct"
 

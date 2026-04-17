@@ -6,3 +6,4 @@ peft>=0.10.0
 accelerate
 bitsandbytes
 sentencepiece
+python-dotenv
