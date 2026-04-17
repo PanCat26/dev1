@@ -73,10 +73,9 @@ QDRANT_VECTOR_SIZE=384
 QDRANT_DISTANCE_METRIC=Cosine
 EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
 DATABASE_URL=postgresql://dev1:dev1@127.0.0.1:5433/dev1db
-GITHUB_TOKEN=
+GITHUB_TOKEN=<your-github-api-token>
 ```
-
-All variables have defaults, so `.env` is optional for local development.
+Most variables have defaults, so `.env` is generally optional for local development. However, `GITHUB_TOKEN` does not have a default value; if it is not provided, you might encounter GitHub API rate limits during repository ingestion.
 
 ## Start Services (PostgreSQL & Qdrant)
 
@@ -101,7 +100,7 @@ alembic upgrade head
 
 ## Generate a New Database Migration (Alembic)
 
-After making any changes to the SQLAlchemy models located in `database/models/`, generate a new migration script using the autogeneration feature:
+After making any changes to the SQLAlchemy models located in `repository_management/models/`, generate a new migration script using the autogeneration feature:
 ```bash
 alembic revision --autogenerate -m "Your descriptive message here"
 ```
