@@ -110,3 +110,21 @@ python scripts/run_indexing_demo.py . my-repo abc1234
 
 The script prints a result summary with file count, chunk count, and any errors.
 You can verify the data in the Qdrant dashboard at http://localhost:6333/dashboard.
+
+## Retrieval Service
+
+### Run Retrieval Demo
+
+After indexing your repository (see above), test the retrieval service:
+
+```bash
+python scripts/run_retrieval_demo.py
+```
+
+Edit the script to change the `REPO_ID`, `COMMIT_SHA`, and `QUERY` to test different scenarios.
+
+Example with hardcoded values:
+
+```bash
+python scripts/run_retrieval_demo.py my-repo abc1234 "where is embed_query defined"
+```
