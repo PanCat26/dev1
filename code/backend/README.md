@@ -4,7 +4,7 @@
 
 - Python 3.12
 - Git
-- Docker (for Qdrant)
+- Docker (for Qdrant and PostgreSQL)
 
 ## Open the backend folder
 
@@ -72,17 +72,39 @@ QDRANT_COLLECTION_NAME=repo_snapshots
 QDRANT_VECTOR_SIZE=384
 QDRANT_DISTANCE_METRIC=Cosine
 EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
+DATABASE_URL=postgresql://dev1:dev1@127.0.0.1:5433/dev1db
+GITHUB_TOKEN=<your-github-api-token>
+```
+Most variables have defaults, so `.env` is generally optional for local development. However, `GITHUB_TOKEN` does not have a default value; if it is not provided, you might encounter GitHub API rate limits during repository ingestion.
+
+## Start Services (PostgreSQL & Qdrant)
+
+Start PostgreSQL:
+```bash
+docker run -d --name postgres_db -p 5433:5432 -e POSTGRES_USER=dev1 -e POSTGRES_PASSWORD=dev1 -e POSTGRES_DB=dev1db postgres:15
 ```
 
-All variables have defaults, so `.env` is optional for local development.
-
-## Start Qdrant
-
+Start Qdrant:
 ```bash
 docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant:v1.13.2
 ```
 
 Qdrant dashboard will be available at http://localhost:6333/dashboard.
+
+## Run Database Migrations (Alembic)
+
+With the virtual environment activated and PostgreSQL running, apply database migrations:
+```bash
+alembic upgrade head
+```
+
+## Generate a New Database Migration (Alembic)
+
+After making any changes to the SQLAlchemy models located in `repository_management/models/`, generate a new migration script using the autogeneration feature:
+```bash
+alembic revision --autogenerate -m "Your descriptive message here"
+```
+Then run the `alembic upgrade head` command shown above to apply it.
 
 ## Create the Qdrant collection
 
@@ -110,3 +132,24 @@ python scripts/run_indexing_demo.py . my-repo abc1234
 
 The script prints a result summary with file count, chunk count, and any errors.
 You can verify the data in the Qdrant dashboard at http://localhost:6333/dashboard.
+
+## Run the Repository Manager demo
+
+This script demonstrates the full ingestion pipeline: it creates a new database entry, snapshots the target directory to local storage, and then automatically kicks off the asynchronous indexing pipeline.
+
+```bash
+python scripts/run_repository_demo.py <github_url>
+```
+
+Example analyzing the backend directory:
+
+```bash
+python scripts/run_repository_demo.py https://github.com/antoniunegrea/Task-Management
+```
+
+This will:
+1. Copy the current folder to `storage/snapshots/<repo_name>_<uuid>`
+2. Skip redundant files and directories (`.git`, `__pycache__`, etc.)
+3. Add a row to the Postgres `repositories` table.
+4. Run background chunking and index it to Qdrant.
+5. Watch the Postgres database until the `status` flips to `ready`.
