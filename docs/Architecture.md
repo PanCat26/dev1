@@ -15,7 +15,7 @@ The system follows the RFC’s proposed **modular monolith with specialized serv
 3. **Repository snapshot storage** on disk
 4. **PostgreSQL** for metadata and application state
 5. **Qdrant** for vector storage and retrieval
-6. **vLLM model-serving process** exposing an OpenAI-compatible API for the fine-tuned small language model
+6. **llama-server model-serving process (from llama.cpp)** exposing an OpenAI-compatible API for the fine-tuned small language model
 
 From an architecture-documentation perspective, these map naturally to the following layers:
 
@@ -136,13 +136,13 @@ The reported metrics then are:
 
 #### 2.6. Model serving integration
 
-The model is served through a separate vLLM server, and the backend services will communicate with it using the corresponding OpenAI-compatible API. This keeps model execution isolated from the main application while preserving a simple request interface for generation.
+The model is served through a separate llama.cpp server, and the backend services will communicate with it using the corresponding OpenAI-compatible API. This keeps model execution isolated from the main application while preserving a simple request interface for generation.
 
 The primary model choice is **Qwen2.5-Coder-7B-Instruct**, a small code-capable instruction model in the 7B range. This size is large enough to support code understanding and repository-aware answer synthesis, while still remaining feasible for fine-tuning and serving in a project setting.
 
 Model adaptation is performed offline. The main supervised dataset is **OpenCodeInstruct**, which is appropriate for code-focused instruction tuning. If needed to improve code-text alignment, the training mix can include the **Python split of CodeSearchNet**. Because the system is specifically designed for Python repositories, Python examples should be prioritized in any training mix.
 
-To reduce compute requirements, fine-tuning will use **PEFT** (**QLoRA**), rather than full-model training. After adaptation, the resulting model is deployed behind the vLLM server and used as the final generator over retrieved repository evidence.
+To reduce compute requirements, fine-tuning will use **PEFT** (**QLoRA**), rather than full-model training. After adaptation, the resulting model is deployed behind the llama.cpp server and used as the final generator over retrieved repository evidence.
 
 ### 3. Data stores
 
@@ -186,7 +186,7 @@ The orchestrator may need to reopen the exact file and inspect a larger code reg
 
 #### 3.4. Training artifact storage
 
-Training artifacts are stored persistently on disk. These include the fine-tuning configuration and the resulting saved adapters or merged checkpoint, which can later be loaded by the vLLM serving process.
+Training artifacts are stored persistently on disk. These include the fine-tuning configuration and the resulting saved adapters or merged checkpoint, which can later be loaded by the llama-server process.
 
 ## Example system flows
 
@@ -202,7 +202,7 @@ This flow establishes the repository snapshot that all future answers must refer
 
 When a user asks a question, the web client sends the query to the backend. The orchestration service analyzes the query and invokes retrieval. The retrieval service embeds the query, searches Qdrant for relevant chunks, and reranks candidates using metadata-aware exact-match signals when useful. If needed, the orchestration service reopens exact files or line ranges from repository snapshot storage.
 
-The backend then assembles a structured evidence package and sends it to the model through the vLLM server. The generated answer is returned to the client together with its supporting file paths and line references.
+The backend then assembles a structured evidence package and sends it to the model through the llama.cpp server. The generated answer is returned to the client together with its supporting file paths and line references.
 
 If the retrieved evidence is insufficient, the backend should return an explicit insufficient-evidence response instead of generating a speculative answer.
 
@@ -227,7 +227,7 @@ The automatic evaluation service runs on held-out repositories. It parses the re
 ### Week 9
 
 - Retrieval and answer orchestration
-- vLLM integration
+- llama.cpp integration
 
 ### Week 10
 
