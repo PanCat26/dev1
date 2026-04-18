@@ -23,7 +23,7 @@ async def test_streaming(prompt: str):
 
 
 def main():
-    prompt = sys.argv[1] if len(sys.argv) > 1 else "Write a Python function that reverses a string."
+    prompt = sys.argv[1] if len(sys.argv) > 1 else "Write a Python function that reverses a string and explain it."
     asyncio.run(test_streaming(prompt))
 
 
