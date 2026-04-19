@@ -57,8 +57,20 @@ def upsert_chunks(
     points = []
 
     for chunk, vector in zip(chunks, vectors):
+        # Deterministic id so re-indexing the same chunk updates the point
+        # instead of creating a duplicate.
+        point_key = "|".join([
+            chunk.repo_id,
+            chunk.commit_sha,
+            chunk.file_path,
+            chunk.chunk_type,
+            chunk.symbol_name,
+            f"{chunk.start_line}-{chunk.end_line}",
+        ])
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, point_key))
+
         points.append(PointStruct(
-            id=str(uuid.uuid4()),
+            id=point_id,
             vector=vector,
             payload={
                 "repo_id": chunk.repo_id,
