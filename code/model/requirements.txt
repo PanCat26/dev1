@@ -1,0 +1,9 @@
+torch
+transformers>=4.37.0
+datasets
+trl>=0.8.0
+peft>=0.10.0
+accelerate
+bitsandbytes
+sentencepiece
+python-dotenv

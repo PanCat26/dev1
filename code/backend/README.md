@@ -74,8 +74,11 @@ QDRANT_DISTANCE_METRIC=Cosine
 EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
 DATABASE_URL=postgresql://dev1:dev1@127.0.0.1:5433/dev1db
 GITHUB_TOKEN=<your-github-api-token>
+LLAMA_SERVER_URL=http://localhost:8080
 ```
 Most variables have defaults, so `.env` is generally optional for local development. However, `GITHUB_TOKEN` does not have a default value; if it is not provided, you might encounter GitHub API rate limits during repository ingestion.
+
+Override the default for `LLAMA_SERVER_URL` it if your llama-server runs on a different port.
 
 ## Start Services (PostgreSQL & Qdrant)
 
@@ -153,3 +156,33 @@ This will:
 3. Add a row to the Postgres `repositories` table.
 4. Run background chunking and index it to Qdrant.
 5. Watch the Postgres database until the `status` flips to `ready`.
+
+## Start the language model server
+
+The backend communicates with a locally running llama-server instance (from llama.cpp) that serves the fine-tuned model. See `code/model/README.md` for full instructions on building llama.cpp and running the model.
+
+Once you have a GGUF model file ready, start the server:
+
+### Linux / macOS
+
+```bash
+./build/bin/llama-server -m <path-to-gguf-file> --port 8080 -c <total-context>
+```
+
+### Windows
+
+```powershell
+.\build\bin\Release\llama-server.exe -m <path-to-gguf-file> --port 8080 -c <total-context>
+```
+
+The server exposes an OpenAI-compatible API at `http://localhost:8080`. The backend connects to it automatically using the `LLAMA_SERVER_URL` environment variable.
+
+## Run the language model demo
+
+Make sure llama-server is running, then:
+
+```bash
+python scripts/run_language_model_demo.py <prompt>
+```
+
+If no prompt is provided, a default one is used. The script streams the model's response token by token to the terminal.
