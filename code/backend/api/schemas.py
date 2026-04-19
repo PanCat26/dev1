@@ -17,3 +17,9 @@ class RepositoryAddedOut(BaseModel):
 
 class RefreshOut(BaseModel):
     updated: bool
+
+
+class RepositoryStatusOut(BaseModel):
+    id: uuid.UUID
+    status: str
+    commit_sha: str

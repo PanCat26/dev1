@@ -1,16 +1,22 @@
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database.session import get_db
+from repository_management.crud import get_repository
 from repository_management.manager import (
     add_repository,
     delete_repository,
     refresh_repository,
     retry_indexing,
 )
-from api.schemas import AddRepositoryIn, RefreshOut, RepositoryAddedOut
+from api.schemas import (
+    AddRepositoryIn,
+    RefreshOut,
+    RepositoryAddedOut,
+    RepositoryStatusOut,
+)
 
 router = APIRouter(prefix="/repositories", tags=["repositories"])
 
@@ -68,3 +74,14 @@ def delete_repository_endpoint(
     db: Session = Depends(get_db),
 ):
     delete_repository(db_session=db, repo_id=repo_id)
+
+
+@router.get("/{repo_id}/status", response_model=RepositoryStatusOut)
+def get_repository_status_endpoint(
+    repo_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = get_repository(db, repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail=f"Repository {repo_id} not found.")
+    return RepositoryStatusOut(id=repo.id, status=repo.status, commit_sha=repo.commit_sha)
