@@ -1,14 +1,28 @@
 import sys
 import os
+import threading
 import time
 import uuid
 from contextlib import contextmanager
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from fastapi import BackgroundTasks
+
 from database.session import get_db
 from repository_management.manager import add_repository, delete_repository
 from repository_management.crud import get_repository
+
+
+def _run_background_tasks(background_tasks: BackgroundTasks) -> None:
+    """Run queued BackgroundTasks in a daemon thread, mirroring FastAPI's
+    after-response behavior so the script can keep polling for status.
+    """
+    def _runner():
+        for task in background_tasks.tasks:
+            task.func(*task.args, **task.kwargs)
+
+    threading.Thread(target=_runner, daemon=True).start()
 
 
 USAGE = (
@@ -24,16 +38,22 @@ USAGE = (
 def cmd_add(github_url: str):
     print(f"Adding repository from GitHub: {github_url}")
 
+    background_tasks = BackgroundTasks()
+
     with contextmanager(get_db)() as db:
         repo_id, default_branch, commit_sha, name = add_repository(
             db_session=db,
             github_link=github_url,
+            background_tasks=background_tasks,
         )
         print(f"\nSuccessfully downloaded and triggered indexing!")
         print(f"Repo ID: {repo_id}")
         print(f"Name: {name}")
         print(f"Branch: {default_branch}")
         print(f"Commit: {commit_sha}")
+
+        # No FastAPI request lifecycle here; run the queued tasks ourselves.
+        _run_background_tasks(background_tasks)
 
         print("\nWaiting for background indexing to complete...")
         while True:
