@@ -143,11 +143,19 @@ This script demonstrates the full ingestion pipeline: it creates a new database 
 ```bash
 python scripts/run_repository_demo.py <github_url>
 ```
+or
+```bash
+python scripts/run_repository_demo.py add <github_url>
+```
 
 Example analyzing the backend directory:
 
 ```bash
 python scripts/run_repository_demo.py https://github.com/antoniunegrea/Task-Management
+```
+or
+```bash
+python scripts/run_repository_demo.py add https://github.com/antoniunegrea/Task-Management
 ```
 
 This will:
@@ -156,6 +164,16 @@ This will:
 3. Add a row to the Postgres `repositories` table.
 4. Run background chunking and index it to Qdrant.
 5. Watch the Postgres database until the `status` flips to `ready`.
+
+### Delete a repository
+
+Removes the repository's DB row, its indexed chunks from Qdrant (filtered by `repo_id`), and its snapshot directory on disk.
+
+```bash
+python scripts/run_repository_demo.py delete <repo_id>
+```
+
+The `<repo_id>` is the UUID printed by the `add` command above, and can also be found in the `repositories` table or in any Qdrant chunk's payload.
 
 ## Start the language model server
 
