@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -29,4 +30,17 @@ class RepositoryStatusOut(BaseModel):
 class ConversationOut(BaseModel):
     id: uuid.UUID
     repository_id: uuid.UUID
+    created_at: datetime
+
+
+class MessageCreateIn(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+
+class MessageOut(BaseModel):
+    id: uuid.UUID
+    conversation_id: uuid.UUID
+    role: str
+    content: str
     created_at: datetime
