@@ -151,10 +151,6 @@ python scripts/run_repository_demo.py add <github_url>
 Example analyzing the backend directory:
 
 ```bash
-python scripts/run_repository_demo.py https://github.com/antoniunegrea/Task-Management
-```
-or
-```bash
 python scripts/run_repository_demo.py add https://github.com/antoniunegrea/Task-Management
 ```
 
@@ -174,6 +170,27 @@ python scripts/run_repository_demo.py delete <repo_id>
 ```
 
 The `<repo_id>` is the UUID printed by the `add` command above, and can also be found in the `repositories` table or in any Qdrant chunk's payload.
+
+## Run the API server
+
+With Postgres and Qdrant running and migrations applied:
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Open `http://127.0.0.1:8000/docs` for the Swagger UI to try every endpoint interactively.
+
+Endpoints:
+
+| Method | Path | Description |
+|---|---|---|
+| `POST`   | `/repositories`                   | Add a repository. Body: `{"github_url":"..."}`. Schedules indexing. |
+| `POST`   | `/repositories/{repo_id}/refresh` | Pull latest commit and reindex if changed. |
+| `POST`   | `/repositories/{repo_id}/retry`   | Retry indexing. |
+| `DELETE` | `/repositories/{repo_id}`         | Delete repo row, Qdrant chunks, snapshot dir. |
+
+Invalid input or unknown `repo_id` → `400`, malformed UUID/body → `422`.
 
 ## Start the language model server
 
