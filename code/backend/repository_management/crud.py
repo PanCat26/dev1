@@ -34,3 +34,13 @@ def create_conversation(db: Session, repo_id: uuid.UUID) -> Conversation:
 
 def get_conversations(db: Session, repo_id: uuid.UUID) -> List[Conversation]:
     return db.query(Conversation).filter(Conversation.repository_id == repo_id).all()
+
+def get_conversation(db: Session, conv_id: uuid.UUID) -> Optional[Conversation]:
+    return db.query(Conversation).filter(Conversation.id == conv_id).first()
+
+def delete_conversation(db: Session, conv_id: uuid.UUID) -> bool:
+    db_conv = get_conversation(db, conv_id)
+    if not db_conv:
+        return False
+    db.delete(db_conv)
+    return True

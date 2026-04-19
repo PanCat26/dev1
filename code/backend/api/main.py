@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from api.routers import repositories
+from api.routers import conversations, repositories
 
 app = FastAPI(title="dev1's backend")
 
 app.include_router(repositories.router)
+app.include_router(conversations.router)
 
 
 @app.exception_handler(ValueError)
