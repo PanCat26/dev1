@@ -179,18 +179,7 @@ With Postgres and Qdrant running and migrations applied:
 uvicorn api.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` for the Swagger UI to try every endpoint interactively.
-
-Endpoints:
-
-| Method | Path | Description |
-|---|---|---|
-| `POST`   | `/repositories`                   | Add a repository. Body: `{"github_url":"..."}`. Schedules indexing. |
-| `POST`   | `/repositories/{repo_id}/refresh` | Pull latest commit and reindex if changed. |
-| `POST`   | `/repositories/{repo_id}/retry`   | Retry indexing. |
-| `DELETE` | `/repositories/{repo_id}`         | Delete repo row, Qdrant chunks, snapshot dir. |
-
-Invalid input or unknown `repo_id` → `400`, malformed UUID/body → `422`.
+Open `http://127.0.0.1:8000/docs` for the Swagger UI listing every endpoint interactively.
 
 ## Start the language model server
 
