@@ -11,9 +11,12 @@ app.include_router(conversations.router)
 
 @app.exception_handler(ValueError)
 async def value_error_handler(_request: Request, exc: ValueError):
-    # Manager functions use ValueError for invalid input and missing entities.
-    # Map those to HTTP 400 here to keep endpoint code clean.
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
+    detail = str(exc)
+
+    # Manager functions use ValueError for both invalid input and missing entities.
+    # Preserve 400 for validation/input errors, but return 404 for missing resources.
+    status_code = 404 if "not found" in detail.lower() else 400
+    return JSONResponse(status_code=status_code, content={"detail": detail})
 
 
 @app.get("/health")
