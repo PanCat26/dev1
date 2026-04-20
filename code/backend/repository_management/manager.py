@@ -1,8 +1,9 @@
 import os
 import shutil
-import threading
 from typing import Tuple
 import uuid
+
+from fastapi import BackgroundTasks
 
 from config import SNAPSHOTS_DIR
 from contextlib import contextmanager
@@ -10,14 +11,9 @@ from database.session import get_db
 from repository_management.crud import create_repository, get_repository, update_repository_status
 from indexing.service import run_indexing
 from repository_management.github_utils import fetch_github_metadata, download_and_extract_zip
+from qdrant.client import get_qdrant_client
+from qdrant.collection import delete_chunks
 
-def _start_indexing_thread(repo_id: uuid.UUID, commit_sha: str, snapshot_path: str):
-    thread = threading.Thread(
-        target=_async_index_task, 
-        args=(repo_id, commit_sha, snapshot_path),
-        daemon=True
-    )
-    thread.start()
 
 def _async_index_task(repo_id: uuid.UUID, commit_sha: str, snapshot_path: str):
     """Runs the indexing pipeline in the background and updates the repository status."""
@@ -40,7 +36,11 @@ def _async_index_task(repo_id: uuid.UUID, commit_sha: str, snapshot_path: str):
 
 
 
-def add_repository(db_session, github_link: str) -> Tuple[uuid.UUID, str, str, str]:
+def add_repository(
+    db_session,
+    github_link: str,
+    background_tasks: BackgroundTasks,
+) -> Tuple[uuid.UUID, str, str, str]:
     """Adds a repository organically using the GitHub REST API"""
     link = github_link.rstrip('/').split('/')
     if len(link) < 2:
@@ -73,7 +73,7 @@ def add_repository(db_session, github_link: str) -> Tuple[uuid.UUID, str, str, s
         repo.snapshot_path = target_path
         db_session.commit()
         
-        _start_indexing_thread(repo.id, commit_sha, target_path)
+        background_tasks.add_task(_async_index_task, repo.id, commit_sha, target_path)
         return (repo.id, default_branch, commit_sha, name)
         
     except Exception as e:
@@ -82,7 +82,27 @@ def add_repository(db_session, github_link: str) -> Tuple[uuid.UUID, str, str, s
             shutil.rmtree(target_path)
         raise
 
-def retry_indexing(db_session, repo_id: uuid.UUID):
+def delete_repository(db_session, repo_id: uuid.UUID) -> None:
+    """Delete a repository's chunks, DB row and snapshot."""
+    repo = get_repository(db_session, repo_id)
+    if not repo:
+        raise ValueError(f"Repository {repo_id} not found.")
+
+    snapshot_path = repo.snapshot_path
+
+    db_session.delete(repo)
+
+    client = get_qdrant_client()
+    delete_chunks(client, {"repo_id": str(repo_id)})
+
+    db_session.commit()
+
+    # Disk last: a failure here only leaks bytes, not consistency.
+    if snapshot_path and snapshot_path != "pending" and os.path.exists(snapshot_path):
+        shutil.rmtree(snapshot_path)
+
+
+def retry_indexing(db_session, repo_id: uuid.UUID, background_tasks: BackgroundTasks):
     """Retries indexing for an existing repository."""
     repo = get_repository(db_session, repo_id)
     if not repo:
@@ -94,9 +114,9 @@ def retry_indexing(db_session, repo_id: uuid.UUID):
     repo.status = "indexing"
     db_session.commit()
     
-    _start_indexing_thread(repo.id, repo.commit_sha, repo.snapshot_path)
+    background_tasks.add_task(_async_index_task, repo.id, repo.commit_sha, repo.snapshot_path)
 
-def refresh_repository(db_session, repo_id: uuid.UUID) -> bool:
+def refresh_repository(db_session, repo_id: uuid.UUID, background_tasks: BackgroundTasks) -> bool:
     """Pulls the latest changes (if any) and reindexes the repository."""
     repo = get_repository(db_session, repo_id)
     if not repo:
@@ -143,8 +163,8 @@ def refresh_repository(db_session, repo_id: uuid.UUID) -> bool:
         if os.path.exists(backup_path):
             shutil.rmtree(backup_path)
             
-        # 5. Start thread
-        _start_indexing_thread(repo.id, repo.commit_sha, repo.snapshot_path)
+        # 5. Schedule indexing
+        background_tasks.add_task(_async_index_task, repo.id, repo.commit_sha, repo.snapshot_path)
         return True
         
     except Exception as e:

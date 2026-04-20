@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 import uuid
 from repository_management.models.repository import Repository
 from repository_management.models.conversation import Conversation
+from repository_management.models.message import Message
 from typing import List, Optional
 
 def create_repository(db: Session, name: str, github_url: str, default_branch: str, snapshot_path: str, commit_sha: str) -> Repository:
@@ -34,3 +35,26 @@ def create_conversation(db: Session, repo_id: uuid.UUID) -> Conversation:
 
 def get_conversations(db: Session, repo_id: uuid.UUID) -> List[Conversation]:
     return db.query(Conversation).filter(Conversation.repository_id == repo_id).all()
+
+def get_conversation(db: Session, conv_id: uuid.UUID) -> Optional[Conversation]:
+    return db.query(Conversation).filter(Conversation.id == conv_id).first()
+
+def delete_conversation(db: Session, conv_id: uuid.UUID) -> bool:
+    db_conv = get_conversation(db, conv_id)
+    if not db_conv:
+        return False
+    db.delete(db_conv)
+    return True
+
+def get_messages(db: Session, conv_id: uuid.UUID) -> List[Message]:
+    return (
+        db.query(Message)
+        .filter(Message.conversation_id == conv_id)
+        .order_by(Message.created_at)
+        .all()
+    )
+
+def create_message(db: Session, conv_id: uuid.UUID, role: str, content: str) -> Message:
+    db_msg = Message(conversation_id=conv_id, role=role, content=content)
+    db.add(db_msg)
+    return db_msg
