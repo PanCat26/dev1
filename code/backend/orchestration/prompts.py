@@ -14,13 +14,13 @@ def assemble_evidence_package(retrieved_chunks: List[Dict[str, Any]], tool_outpu
             evidence_blocks.append(block)
             
     if tool_outputs:
-         evidence_blocks.append("### Agent Inspection Results (Exact Evidence) ###\n")
-         for output in tool_outputs:
-             tool_name = output.get('tool')
-             args = output.get('params')
-             result = output.get('result')
-             block = f"Tool Call: {tool_name}({args})\nOutput:\n```\n{result}\n```\n"
-             evidence_blocks.append(block)
+        evidence_blocks.append("### Agent Inspection Results (Exact Evidence) ###\n")
+        for output in tool_outputs:
+            tool_name = output.get('tool')
+            args = output.get('params')
+            result = output.get('result')
+            block = f"Tool Call: {tool_name}({args})\nOutput:\n```\n{result}\n```\n"
+            evidence_blocks.append(block)
              
     if not evidence_blocks:
         return "No relevant evidence found in the repository."
