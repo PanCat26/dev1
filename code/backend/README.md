@@ -76,6 +76,7 @@ DATABASE_URL=postgresql://dev1:dev1@127.0.0.1:5433/dev1db
 GITHUB_TOKEN=<your-github-api-token>
 LLAMA_SERVER_URL=http://localhost:8080
 ```
+
 Most variables have defaults, so `.env` is generally optional for local development. However, `GITHUB_TOKEN` does not have a default value; if it is not provided, you might encounter GitHub API rate limits during repository ingestion.
 
 Override the default for `LLAMA_SERVER_URL` it if your llama-server runs on a different port.
@@ -83,11 +84,13 @@ Override the default for `LLAMA_SERVER_URL` it if your llama-server runs on a di
 ## Start Services (PostgreSQL & Qdrant)
 
 Start PostgreSQL:
+
 ```bash
 docker run -d --name postgres_db -p 5433:5432 -e POSTGRES_USER=dev1 -e POSTGRES_PASSWORD=dev1 -e POSTGRES_DB=dev1db postgres:15
 ```
 
 Start Qdrant:
+
 ```bash
 docker run -d --name qdrant -p 6333:6333 -p 6334:6334 qdrant/qdrant:v1.13.2
 ```
@@ -97,6 +100,7 @@ Qdrant dashboard will be available at http://localhost:6333/dashboard.
 ## Run Database Migrations (Alembic)
 
 With the virtual environment activated and PostgreSQL running, apply database migrations:
+
 ```bash
 alembic upgrade head
 ```
@@ -104,9 +108,11 @@ alembic upgrade head
 ## Generate a New Database Migration (Alembic)
 
 After making any changes to the SQLAlchemy models located in `repository_management/models/`, generate a new migration script using the autogeneration feature:
+
 ```bash
 alembic revision --autogenerate -m "Your descriptive message here"
 ```
+
 Then run the `alembic upgrade head` command shown above to apply it.
 
 ## Create the Qdrant collection
@@ -151,6 +157,7 @@ python scripts/run_repository_demo.py https://github.com/antoniunegrea/Task-Mana
 ```
 
 This will:
+
 1. Copy the current folder to `storage/snapshots/<repo_name>_<uuid>`
 2. Skip redundant files and directories (`.git`, `__pycache__`, etc.)
 3. Add a row to the Postgres `repositories` table.
