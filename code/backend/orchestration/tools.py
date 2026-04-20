@@ -1,7 +1,7 @@
 import os
 import ast
 from typing import List, Dict, Optional, Tuple, Any
-from backend.repository.mock_storage import MockRepositoryStorage
+from repository.mock_storage import MockRepositoryStorage
 
 class RepositoryTools:
     """Implementations for the four bounded agentic tools on a repository snapshot."""
