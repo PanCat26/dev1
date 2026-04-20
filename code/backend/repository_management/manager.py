@@ -83,17 +83,18 @@ def add_repository(
         raise
 
 def delete_repository(db_session, repo_id: uuid.UUID) -> None:
-    """Delete a repository's chunks, DB row and snapshot. Order: Qdrant -> DB -> disk."""
+    """Delete a repository's chunks, DB row and snapshot."""
     repo = get_repository(db_session, repo_id)
     if not repo:
         raise ValueError(f"Repository {repo_id} not found.")
 
     snapshot_path = repo.snapshot_path
 
+    db_session.delete(repo)
+
     client = get_qdrant_client()
     delete_chunks(client, {"repo_id": str(repo_id)})
 
-    db_session.delete(repo)
     db_session.commit()
 
     # Disk last: a failure here only leaks bytes, not consistency.
