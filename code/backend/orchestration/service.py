@@ -1,5 +1,5 @@
 import json
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any
 from orchestration.tools import RepositoryTools, TOOLS_SCHEMA
 from orchestration.prompts import assemble_evidence_package, build_system_prompt
 from retrieval.mock_service import MockRetrievalService
