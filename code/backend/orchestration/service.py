@@ -1,10 +1,10 @@
 import json
 from typing import List, Dict, Any, Optional
-from backend.orchestration.tools import RepositoryTools, TOOLS_SCHEMA
-from backend.orchestration.prompts import assemble_evidence_package, build_system_prompt
-from backend.retrieval.mock_service import MockRetrievalService
-from backend.llm.mock_client import MockLLMClient
-from backend.repository.mock_storage import MockRepositoryStorage
+from orchestration.tools import RepositoryTools, TOOLS_SCHEMA
+from orchestration.prompts import assemble_evidence_package, build_system_prompt
+from retrieval.mock_service import MockRetrievalService
+from llm.mock_client import MockLLMClient
+from repository.mock_storage import MockRepositoryStorage
 
 class OrchestrationService:
     """
