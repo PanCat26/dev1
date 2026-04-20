@@ -32,7 +32,7 @@ Reduce unsupported or invented claims by keeping answers anchored in the ingeste
 
 ## Proposed solution
 
-The system will be implemented as a modular monolith with specialized services. The implementation consists of: **(1)** a Next.js/React web client for repository selection, chat, and user feedback; **(2)** a FastAPI backend exposing REST endpoints for repository management and WebSocket endpoints for streamed answers; will aditionally serve as storage for the uploaded repository files; **(3)** PostgreSQL database for metadata and application state; **(4)** Qdrant for vectors and retrieval;  **(5)** a dedicated vLLM model-serving process exposing an OpenAI-compatible API for the fine-tuned SLM. FastAPI is a strong fit here because it is a high-performance Python API framework and supports both background tasks and WebSocket-based streaming. vLLM is a good serving choice because it already exposes an OpenAI-compatible HTTP server, which lets the rest of the application talk to the SLM through a stable interface.
+The system will be implemented as a modular monolith with specialized services. The implementation consists of: **(1)** a Next.js/React web client for repository selection, chat, and user feedback; **(2)** a FastAPI backend exposing REST endpoints for repository management and WebSocket endpoints for streamed answers; will aditionally serve as storage for the uploaded repository files; **(3)** PostgreSQL database for metadata and application state; **(4)** Qdrant for vectors and retrieval;  **(5)** a dedicated llama.cpp model-serving process exposing an OpenAI-compatible API for the fine-tuned SLM. FastAPI is a strong fit here because it is a high-performance Python API framework and supports both background tasks and WebSocket-based streaming. llama.cpp is a good serving choice because it already exposes an OpenAI-compatible HTTP server, which lets the rest of the application talk to the SLM through a stable interface, and it provides portable, efficient local inference.
 
 ### Repository ingestion and indexing pipeline
 
@@ -75,13 +75,13 @@ To keep the system manageable, the first version should avoid unrestricted tool 
 
 ### Fine-tuned small language model
 
-The core model should be a small code-capable language model in the 7B parameter range such as Qwen2.5-Coder-7B-Instruct, served through vLLM and exposed to the backend through an OpenAI-compatible API. The purpose of fine-tuning is not to teach the model programming from scratch, but to adapt it to the types of code understanding and code generation tasks required by the assistant.
+The core model should be a small code-capable language model in the 7B parameter range such as Qwen2.5-Coder-7B-Instruct, served through llama.cpp and exposed to the backend through an OpenAI-compatible API. The purpose of fine-tuning is not to teach the model programming from scratch, but to adapt it to the types of code understanding and code generation tasks required by the assistant.
 
 The supervised fine-tuning stage should rely primarily on a small number of existing code datasets. The main supervised fine-tuning dataset should be **OpenCodeInstruct**, since it is an instruction-tuning dataset designed specifically for code LLMs and contains around 5 million coding question-answer pairs for supervised fine-tuning. To strengthen code understanding and code-search behavior, the model can be further trained or mixed with the **Python split of CodeSearchNet**, which contains large-scale natural-language and code pairs built from function-level comments and code. 
 
 Since the assistant is focused on Python repositories, the fine-tuning setup should prioritize Python examples from the any used dataset.
 
-To keep the project feasible, fine-tuning should use parameter-efficient methods rather than full-model training. A practical setup is to use Hugging Face Transformers together with PEFT and LoRA or QLoRA. This reduces hardware requirements while still allowing the base model to be adapted to the target task. After fine-tuning, the model can be deployed behind a vLLM server and called from the FastAPI backend through an OpenAI-compatible HTTP interface.
+To keep the project feasible, fine-tuning should use parameter-efficient methods rather than full-model training. A practical setup is to use Hugging Face Transformers together with PEFT and LoRA or QLoRA. This reduces hardware requirements while still allowing the base model to be adapted to the target task. After fine-tuning, the model can be deployed behind a llama.cpp server and called from the FastAPI backend through an OpenAI-compatible HTTP interface.
 
 The human feedback objective should also be implemented in a lightweight way. Instead of a full online RLHF pipeline, the system can collect user feedback during normal usage and periodically turn that feedback into a preference dataset. That dataset will later be used for an additional preference-optimization stage, for example with DPO.
 
@@ -107,12 +107,12 @@ Each answer should be linked to its supporting evidence. The backend should atta
 
 ### Development
 
-Development should proceed in two stages. First, an MVP should be built and tested locally: the Next.js frontend, FastAPI backend, PostgreSQL, Qdrant, and the repository-storage directory can run together in a simple development environment, while the fine-tuned model is served separately through vLLM’s OpenAI-compatible server. Second, once ingestion, retrieval, and chat are stable, the system should be tested on a small set of held-out Python repositories, and the pairwise-feedback flow should be enabled so preference data can start being collected for later DPO tuning.
+Development should proceed in two stages. First, an MVP should be built and tested locally: the Next.js frontend, FastAPI backend, PostgreSQL, Qdrant, and the repository-storage directory can run together in a simple development environment, while the fine-tuned model is served separately through llama.cpp’s OpenAI-compatible server. Second, once ingestion, retrieval, and chat are stable, the system should be tested on a small set of held-out Python repositories, and the pairwise-feedback flow should be enabled so preference data can start being collected for later DPO tuning.
 
 ### References
 
 1. **FastAPI** - [link](https://fastapi.tiangolo.com/)
-2. **vLLM** - [link](https://docs.vllm.ai/en/stable/)
+2. **llama.cpp** - [link](https://github.com/ggml-org/llama.cpp)
 3. **Qdrant** - [link](https://qdrant.tech/documentation/)
 4. **PEFT (Parameter-Efficient Fine-Tuning)** - [link](https://huggingface.co/docs/peft)
 5. **OpenCodeInstruct** - [link](https://huggingface.co/datasets/nvidia/OpenCodeInstruct)

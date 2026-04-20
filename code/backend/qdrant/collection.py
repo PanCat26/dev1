@@ -1,7 +1,16 @@
 import uuid
+from typing import Any
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    FilterSelector,
+    MatchValue,
+    PointStruct,
+    VectorParams,
+)
 import config
 
 from indexing.types import Chunk
@@ -48,8 +57,20 @@ def upsert_chunks(
     points = []
 
     for chunk, vector in zip(chunks, vectors):
+        # Deterministic id so re-indexing the same chunk updates the point
+        # instead of creating a duplicate.
+        point_key = "|".join([
+            chunk.repo_id,
+            chunk.commit_sha,
+            chunk.file_path,
+            chunk.chunk_type,
+            chunk.symbol_name,
+            f"{chunk.start_line}-{chunk.end_line}",
+        ])
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, point_key))
+
         points.append(PointStruct(
-            id=str(uuid.uuid4()),
+            id=point_id,
             vector=vector,
             payload={
                 "repo_id": chunk.repo_id,
@@ -69,3 +90,21 @@ def upsert_chunks(
         client.upsert(collection_name=collection_name, points=batch)
 
     return len(points)
+
+
+def delete_chunks(client: QdrantClient, fields: dict[str, Any]) -> None:
+    """Delete points from the configured collection whose payload matches all given fields.
+    Intended primarily for deleting by `repo_id`, but works with any exact-match payload fields.
+    """
+    if not fields:
+        raise ValueError("delete_chunks requires at least one field to match on.")
+
+    conditions = [
+        FieldCondition(key=key, match=MatchValue(value=value))
+        for key, value in fields.items()
+    ]
+
+    client.delete(
+        collection_name=config.QDRANT_COLLECTION_NAME,
+        points_selector=FilterSelector(filter=Filter(must=conditions)),
+    )
