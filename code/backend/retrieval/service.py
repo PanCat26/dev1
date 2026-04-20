@@ -9,9 +9,9 @@ from retrieval.types import EvidencePackage
 def retrieve_for_query(
     query: str,
     repo_id: str,
-    commit_sha: str,
+    commit_sha: str | None = None,
     num_candidates: int = 20,
-    max_chunks_in_package: int = 5,
+    max_chunks_per_category_in_package: int = 3,
 ) -> EvidencePackage:
     """Execute the full retrieval pipeline for a user query.
     
@@ -40,6 +40,7 @@ def retrieve_for_query(
     query = query.strip()
     if not query:
         raise ValueError("query must not be empty")
+    repo_id = repo_id.strip()
     if not repo_id:
         raise ValueError("repo_id must not be empty")
     
@@ -74,5 +75,5 @@ def retrieve_for_query(
         query=query,
         repo_id=repo_id,
         commit_sha=commit_sha,
-        max_chunks_per_group=max_chunks_in_package,
+        max_chunks_per_category_in_group=max_chunks_per_category_in_package,
     )

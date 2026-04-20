@@ -37,9 +37,11 @@ def extract_query_terms(query: str) -> dict:
     symbols = set()
     files = set()
     
-    # Extract CamelCase words (class names) - keep as is
+    # Extract CamelCase words (class names)
     camel_case = re.findall(r'\b[A-Z][a-zA-Z0-9]*\b', query)
-    symbols.update(s.lower() for s in camel_case)
+    for term in camel_case:
+        if term.lower() not in STOPWORDS:
+            symbols.add(term.lower())
     
     # Extract snake_case words (function/variable names) - filter stopwords
     snake_case = re.findall(r'\b[a-z_][a-z0-9_]*\b', query)
@@ -132,8 +134,7 @@ def rank_chunks(
             symbol_boost=symbol_boost,
             file_boost=file_boost,
         )
-        # Final score: vector similarity + small boost (no capping)
-        chunk.final_score = chunk.vector_score + boost
+        chunk.final_score = chunk.vector_score * (1 + boost)
     
     # Sort by final score (descending)
     chunks.sort(key=lambda c: c.final_score, reverse=True)

@@ -71,7 +71,7 @@ def build_evidence_package(
     query: str,
     repo_id: str,
     commit_sha: str,
-    max_chunks_per_group: int = 5,
+    max_chunks_per_category_in_group: int = 3,
 ) -> EvidencePackage:
     """Build a structured evidence package for answer generation.
     
@@ -95,8 +95,11 @@ def build_evidence_package(
     limited_groups = [
         EvidenceGroup(
             role=group.role,
-            chunks=group.chunks[:max_chunks_per_group],
-            description=group.description,
+            chunks=group.chunks[:max_chunks_per_category_in_group],
+            description=group.description.replace(
+                f"({len(group.chunks)} chunks)", 
+                f"({len(group.chunks[:max_chunks_per_category_in_group])} chunks)"
+            ),
         )
         for group in groups
     ]

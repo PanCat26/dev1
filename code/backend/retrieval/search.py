@@ -9,7 +9,7 @@ def search_chunks(
     client: QdrantClient,
     query_vector: list[float],
     repo_id: str,
-    commit_sha: str,
+    commit_sha: str | None = None,
     limit: int = 10,
 ) -> list[RetrievedChunk]:
     """Search Qdrant for chunks similar to the query vector.

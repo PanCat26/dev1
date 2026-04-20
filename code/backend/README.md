@@ -115,16 +115,20 @@ You can verify the data in the Qdrant dashboard at http://localhost:6333/dashboa
 
 ### Run Retrieval Demo
 
-After indexing your repository (see above), test the retrieval service:
+After indexing your repository (see above), test the retrieval service with:
 
 ```bash
-python scripts/run_retrieval_demo.py
+python scripts/run_retrieval_demo.py <repo_id> <commit_sha> <query>
 ```
 
-Edit the script to change the `REPO_ID`, `COMMIT_SHA`, and `QUERY` to test different scenarios.
-
-Example with hardcoded values:
+Example:
 
 ```bash
 python scripts/run_retrieval_demo.py my-repo abc1234 "where is embed_query defined"
 ```
+
+The script accepts three arguments:
+
+- `repo_id`: The repository ID used during indexing
+- `commit_sha`: The commit SHA used during indexing
+- `query`: The search query (can be quoted if it contains spaces)
