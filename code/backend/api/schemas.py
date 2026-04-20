@@ -27,6 +27,16 @@ class RepositoryStatusOut(BaseModel):
     commit_sha: str
 
 
+class RepositoryOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    github_url: str
+    default_branch: str
+    commit_sha: str
+    status: str
+    created_at: datetime
+
+
 class ConversationOut(BaseModel):
     id: uuid.UUID
     repository_id: uuid.UUID

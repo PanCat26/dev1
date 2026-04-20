@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database.session import get_db
-from repository_management.crud import get_repository
+from repository_management.crud import get_all_repositories, get_repository
 from repository_management.manager import (
     add_repository,
     delete_repository,
@@ -15,10 +15,27 @@ from api.schemas import (
     AddRepositoryIn,
     RefreshOut,
     RepositoryAddedOut,
+    RepositoryOut,
     RepositoryStatusOut,
 )
 
 router = APIRouter(prefix="/repositories", tags=["repositories"])
+
+
+@router.get("", response_model=list[RepositoryOut])
+def list_repositories_endpoint(db: Session = Depends(get_db)):
+    return [
+        RepositoryOut(
+            id=r.id,
+            name=r.name,
+            github_url=r.github_url,
+            default_branch=r.default_branch,
+            commit_sha=r.commit_sha,
+            status=r.status,
+            created_at=r.created_at,
+        )
+        for r in get_all_repositories(db)
+    ]
 
 
 @router.post("", response_model=RepositoryAddedOut, status_code=status.HTTP_201_CREATED)
