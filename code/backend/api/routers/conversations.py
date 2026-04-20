@@ -1,6 +1,7 @@
 import uuid
+import json
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from database.session import get_db
@@ -14,6 +15,7 @@ from repository_management.crud import (
     get_repository,
 )
 from api.schemas import ConversationOut, MessageCreateIn, MessageOut
+from orchestration.service import OrchestrationService
 
 router = APIRouter(tags=["conversations"])
 
@@ -108,3 +110,61 @@ def create_message_endpoint(
     db.commit()
     db.refresh(msg)
     return _msg_to_out(msg)
+
+from fastapi.concurrency import run_in_threadpool
+
+@router.websocket("/conversations/{conv_id}/ws")
+async def conversation_websocket(
+    websocket: WebSocket,
+    conv_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    await websocket.accept()
+    
+    # We must use run_in_threadpool for all synchronous DB operations inside async route
+    conv = await run_in_threadpool(get_conversation, db, conv_id)
+    if not conv:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Conversation not found")
+        return
+        
+    repo = await run_in_threadpool(get_repository, db, conv.repository_id)
+    if not repo:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Repository not found")
+        return
+        
+    try:
+        while True:
+            data = await websocket.receive_text()
+            
+            # Save user query
+            await run_in_threadpool(create_message, db, conv_id, "user", data)
+            await run_in_threadpool(db.commit)
+            
+            service = OrchestrationService(
+                repo_id=str(repo.id),
+                commit_sha=repo.commit_sha,
+                snapshot_path=repo.snapshot_path
+            )
+            
+            full_answer = ""
+            async for chunk in service.answer_query(data):
+                await websocket.send_text(chunk)
+                try:
+                    event = json.loads(chunk)
+                    if event.get("type") == "content":
+                        full_answer += event.get("delta", "")
+                except json.JSONDecodeError:
+                    pass
+                    
+            if full_answer:
+                await run_in_threadpool(create_message, db, conv_id, "assistant", full_answer)
+                await run_in_threadpool(db.commit)
+                
+            # Signal the client that the generation turn has concluded
+            await websocket.send_text(json.dumps({"type": "done"}))
+                
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
+        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)

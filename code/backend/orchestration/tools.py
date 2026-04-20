@@ -1,21 +1,21 @@
 import ast
 from typing import List, Dict, Optional, Any
-from repository.mock_storage import MockRepositoryStorage
+from repository.storage import LocalRepositoryStorage
 
 class RepositoryTools:
     """Implementations for the four bounded agentic tools on a repository snapshot."""
     
-    def __init__(self, repo_storage: MockRepositoryStorage):
+    def __init__(self, repo_storage: LocalRepositoryStorage):
         self.repo_storage = repo_storage
         
-    def list_files(self, path_prefix: Optional[str] = None) -> List[str]:
+    async def list_files(self, path_prefix: Optional[str] = None) -> List[str]:
         """Inspect the repository tree to find files matching path_prefix."""
-        files = self.repo_storage.list_files(path_prefix)
+        files = await self.repo_storage.list_files(path_prefix)
         return files[:50]  # Bound the maximum files returned
 
-    def open_file(self, file_path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> str:
+    async def open_file(self, file_path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> str:
         """Read an exact region of a repository file. If omitted, reads whole file."""
-        content = self.repo_storage.get_file_content(file_path)
+        content = await self.repo_storage.get_file_content(file_path)
         if content is None:
             return f"Error: File '{file_path}' not found or unreadable."
             
@@ -32,13 +32,13 @@ class RepositoryTools:
         chunk_lines = lines[start_idx:end_idx]
         return "\n".join(chunk_lines)
 
-    def search_code(self, query: str) -> List[Dict[str, Any]]:
+    async def search_code(self, query: str) -> List[Dict[str, Any]]:
         """A simple exact-string match search across the local repository files."""
         results = []
-        files = self.repo_storage.list_files()
+        files = await self.repo_storage.list_files()
         
         for file_path in files:
-            content = self.repo_storage.get_file_content(file_path)
+            content = await self.repo_storage.get_file_content(file_path)
             if not content:
                 continue
                 
@@ -54,16 +54,16 @@ class RepositoryTools:
                         return results
         return results
 
-    def symbol_lookup(self, name: str) -> List[Dict[str, Any]]:
+    async def symbol_lookup(self, name: str) -> List[Dict[str, Any]]:
         """
         Locate a class or function definition in the repository by name using Python's `ast`.
         """
         results = []
-        files = self.repo_storage.list_files()
+        files = await self.repo_storage.list_files()
         python_files = [f for f in files if f.endswith('.py')]
         
         for file_path in python_files:
-            content = self.repo_storage.get_file_content(file_path)
+            content = await self.repo_storage.get_file_content(file_path)
             if not content:
                 continue
                 
