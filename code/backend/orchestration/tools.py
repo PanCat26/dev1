@@ -30,7 +30,7 @@ class RepositoryTools:
         end_idx = min(len(lines), end_line)
         
         chunk_lines = lines[start_idx:end_idx]
-        return "\\n".join(chunk_lines)
+        return "\n".join(chunk_lines)
 
     def search_code(self, query: str) -> List[Dict[str, Any]]:
         """A simple exact-string match search across the local repository files."""
