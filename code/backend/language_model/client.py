@@ -4,9 +4,6 @@ from openai import AsyncOpenAI
 
 import config
 
-
-_MODEL_NAME = "qwen2.5-coder"
-
 client = AsyncOpenAI(
     base_url=f"{config.LLAMA_SERVER_URL}/v1",
     api_key="not-needed",
@@ -26,7 +23,7 @@ async def generate(
         {"type": "tool_calls", "tool_calls": [{"id": "...", "type": "function", "function": {"name": "...", "arguments": "..."}}]}
     """
     kwargs = {
-        "model": _MODEL_NAME,
+        "model": config.LLAMA_MODEL,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
