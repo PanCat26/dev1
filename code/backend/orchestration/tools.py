@@ -1,6 +1,6 @@
 import ast
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from repository.storage import LocalRepositoryStorage
 
@@ -85,8 +85,8 @@ TOOLS_SCHEMA = [
 
 
 async def list_files(
-    storage: LocalRepositoryStorage, path_prefix: Optional[str] = None
-) -> List[str]:
+    storage: LocalRepositoryStorage, path_prefix: str | None = None
+) -> list[str]:
     files = await storage.list_files(path_prefix)
     return files[:50]
 
@@ -94,8 +94,8 @@ async def list_files(
 async def open_file(
     storage: LocalRepositoryStorage,
     file_path: str,
-    start_line: Optional[int] = None,
-    end_line: Optional[int] = None,
+    start_line: int | None = None,
+    end_line: int | None = None,
 ) -> str:
     content = await storage.get_file_content(file_path)
     if content is None:
@@ -112,8 +112,8 @@ async def open_file(
     return "\n".join(lines[start_idx:end_idx])
 
 
-async def search_code(storage: LocalRepositoryStorage, query: str) -> List[Dict[str, Any]]:
-    results: List[Dict[str, Any]] = []
+async def search_code(storage: LocalRepositoryStorage, query: str) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
     files = await storage.list_files()
 
     for file_path in files:
@@ -135,8 +135,8 @@ async def search_code(storage: LocalRepositoryStorage, query: str) -> List[Dict[
     return results
 
 
-async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> List[Dict[str, Any]]:
-    results: List[Dict[str, Any]] = []
+async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
     files = await storage.list_files()
     python_files = [f for f in files if f.endswith(".py")]
 
@@ -175,7 +175,7 @@ _TOOL_HANDLERS = {
 }
 
 
-async def execute_tool_call(storage: LocalRepositoryStorage, call: Dict[str, Any]) -> str:
+async def execute_tool_call(storage: LocalRepositoryStorage, call: dict[str, Any]) -> str:
     func_name = call.get("function", {}).get("name")
     args_str = call.get("function", {}).get("arguments", "{}")
 

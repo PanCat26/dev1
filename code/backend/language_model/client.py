@@ -33,17 +33,15 @@ async def generate(
         kwargs["tools"] = tools
 
     stream = await client.chat.completions.create(**kwargs)
-    
-    tool_calls_dict = {}
+
+    tool_calls_dict: dict[int, dict] = {}
 
     async for chunk in stream:
         delta = chunk.choices[0].delta
-        
-        # Content
+
         if delta.content:
             yield {"type": "content", "content": delta.content}
-            
-        # Tool Calls (Streaming accumulation)
+
         if hasattr(delta, "tool_calls") and delta.tool_calls:
             for tc_delta in delta.tool_calls:
                 idx = tc_delta.index
@@ -51,9 +49,9 @@ async def generate(
                     tool_calls_dict[idx] = {
                         "id": "",
                         "type": "function",
-                        "function": {"name": "", "arguments": ""}
+                        "function": {"name": "", "arguments": ""},
                     }
-                
+
                 if tc_delta.id:
                     tool_calls_dict[idx]["id"] = tc_delta.id
                 if tc_delta.type:

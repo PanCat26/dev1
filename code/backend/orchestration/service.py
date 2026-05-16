@@ -31,19 +31,16 @@ async def answer_query(
         repo_id=repo_id,
         commit_sha=commit_sha,
     )
-    evidence_pkg_str = assemble_evidence_package(evidence_pkg, [])
+    evidence_pkg_str = assemble_evidence_package(evidence_pkg)
     system_prompt = build_system_prompt(evidence_pkg_str)
 
-    if history_messages:
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            *history_messages,
-        ]
-    else:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_query},
-        ]
+    prior_turns = history_messages if history_messages else [
+        {"role": "user", "content": user_query},
+    ]
+    messages: list[dict[str, Any]] = [
+        {"role": "system", "content": system_prompt},
+        *prior_turns,
+    ]
 
     for step in range(MAX_AGENT_STEPS):
         yield json.dumps({"type": "status", "message": f"Agent step {step + 1}/{MAX_AGENT_STEPS}..."})
@@ -76,7 +73,7 @@ async def answer_query(
                                 },
                             }
                         )
-                except Exception:
+                except (json.JSONDecodeError, TypeError, KeyError):
                     pass
 
         assistant_message: dict[str, Any] = {"role": "assistant"}
