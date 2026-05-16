@@ -2,9 +2,10 @@ import uuid
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from database.session import get_db
+from database.session import SessionLocal, get_db
 from repository_management.crud import (
     create_conversation,
     create_message,
@@ -112,64 +113,119 @@ def create_message_endpoint(
     db.refresh(msg)
     return _msg_to_out(msg)
 
-from fastapi.concurrency import run_in_threadpool
+
+def _ws_fetch_repo_context(conv_id: uuid.UUID) -> tuple[str, str, str] | None:
+    """Load repo id / commit / snapshot path in one short session. Returns None if
+    conversation or repository is missing."""
+    db = SessionLocal()
+    try:
+        conv = get_conversation(db, conv_id)
+        if not conv:
+            return None
+        repo = get_repository(db, conv.repository_id)
+        if not repo:
+            return None
+        return (str(repo.id), repo.commit_sha, repo.snapshot_path)
+    finally:
+        db.close()
+
+
+def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
+    db = SessionLocal()
+    try:
+        create_message(db, conv_id, role, content)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _ws_fetch_bounded_history(conv_id: uuid.UUID) -> list[dict[str, str]]:
+    db = SessionLocal()
+    try:
+        return bounded_history_for_llm(get_messages(db, conv_id))
+    finally:
+        db.close()
+
 
 @router.websocket("/conversations/{conv_id}/ws")
 async def conversation_websocket(
     websocket: WebSocket,
     conv_id: uuid.UUID,
-    db: Session = Depends(get_db),
 ):
     await websocket.accept()
-    
-    # We must use run_in_threadpool for all synchronous DB operations inside async route
-    conv = await run_in_threadpool(get_conversation, db, conv_id)
-    if not conv:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Conversation not found")
+
+    ctx = await run_in_threadpool(_ws_fetch_repo_context, conv_id)
+    if ctx is None:
+        await websocket.close(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Conversation or repository not found",
+        )
         return
-        
-    repo = await run_in_threadpool(get_repository, db, conv.repository_id)
-    if not repo:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Repository not found")
-        return
-        
+
+    repo_id, commit_sha, snapshot_path = ctx
+
+    async def _safe_send(text: str) -> bool:
+        try:
+            await websocket.send_text(text)
+            return True
+        except Exception:
+            return False
+
     try:
         while True:
-            
             data = await websocket.receive_text()
-            
-            # Save user query
-            await run_in_threadpool(create_message, db, conv_id, "user", data)
-            await run_in_threadpool(db.commit)
 
-            msgs = await run_in_threadpool(get_messages, db, conv_id)
-            history_messages = bounded_history_for_llm(msgs)
+            try:
+                await run_in_threadpool(_ws_persist_message, conv_id, "user", data)
+            except Exception as e:
+                await _safe_send(
+                    json.dumps({"type": "error", "message": f"Failed to save user message: {e}"})
+                )
+                continue
+
+            history_messages = await run_in_threadpool(_ws_fetch_bounded_history, conv_id)
 
             full_answer = ""
-            async for chunk in answer_query(
-                str(repo.id),
-                repo.commit_sha,
-                repo.snapshot_path,
+            gen = answer_query(
+                repo_id,
+                commit_sha,
+                snapshot_path,
                 data,
                 history_messages=history_messages,
-            ):
-                await websocket.send_text(chunk)
-                try:
-                    event = json.loads(chunk)
-                    if event.get("type") == "content":
-                        full_answer += event.get("delta", "")
-                except json.JSONDecodeError:
-                    pass
-                    
+            )
+            try:
+                async for chunk in gen:
+                    if not await _safe_send(chunk):
+                        break
+                    try:
+                        event = json.loads(chunk)
+                        if event.get("type") == "content":
+                            full_answer += event.get("delta", "")
+                    except json.JSONDecodeError:
+                        pass
+            except Exception as e:
+                await _safe_send(json.dumps({"type": "error", "message": f"Generation failed: {e}"}))
+            finally:
+                await gen.aclose()
+
             if full_answer:
-                await run_in_threadpool(create_message, db, conv_id, "assistant", full_answer)
-                await run_in_threadpool(db.commit)
-                
-            # Signal the client that the generation turn has concluded
-            await websocket.send_text(json.dumps({"type": "done"}))
-                
+                try:
+                    await run_in_threadpool(_ws_persist_message, conv_id, "assistant", full_answer)
+                except Exception as e:
+                    await _safe_send(
+                        json.dumps({"type": "error", "message": f"Failed to save assistant message: {e}"})
+                    )
+
+            await _safe_send(json.dumps({"type": "done"}))
+
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
-        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+        try:
+            await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
+            await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
+        except Exception:
+            pass
