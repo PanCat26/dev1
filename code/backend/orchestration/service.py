@@ -18,6 +18,7 @@ async def answer_query(
     commit_sha: str,
     snapshot_path: str,
     user_query: str,
+    history_messages: list[dict[str, str]] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Retrieve context, run bounded tool-calling loop, stream JSON events."""
     yield json.dumps({"type": "status", "message": "Retrieving semantic context..."})
@@ -33,10 +34,16 @@ async def answer_query(
     evidence_pkg_str = assemble_evidence_package(evidence_pkg, [])
     system_prompt = build_system_prompt(evidence_pkg_str)
 
-    messages: list[dict[str, Any]] = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_query},
-    ]
+    if history_messages:
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": system_prompt},
+            *history_messages,
+        ]
+    else:
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_query},
+        ]
 
     for step in range(MAX_AGENT_STEPS):
         yield json.dumps({"type": "status", "message": f"Agent step {step + 1}/{MAX_AGENT_STEPS}..."})

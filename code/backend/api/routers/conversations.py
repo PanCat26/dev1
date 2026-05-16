@@ -15,6 +15,7 @@ from repository_management.crud import (
     get_repository,
 )
 from api.schemas import ConversationOut, MessageCreateIn, MessageOut
+from orchestration.history import bounded_history_for_llm
 from orchestration.service import answer_query
 
 router = APIRouter(tags=["conversations"])
@@ -140,13 +141,17 @@ async def conversation_websocket(
             # Save user query
             await run_in_threadpool(create_message, db, conv_id, "user", data)
             await run_in_threadpool(db.commit)
-            
+
+            msgs = await run_in_threadpool(get_messages, db, conv_id)
+            history_messages = bounded_history_for_llm(msgs)
+
             full_answer = ""
             async for chunk in answer_query(
                 str(repo.id),
                 repo.commit_sha,
                 repo.snapshot_path,
                 data,
+                history_messages=history_messages,
             ):
                 await websocket.send_text(chunk)
                 try:
