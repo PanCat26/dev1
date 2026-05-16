@@ -68,13 +68,13 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "symbol_lookup",
-            "description": "Locate a class or function definition in the repository by its name.",
+            "description": "Locate a class, module-level function, or class method by name.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "name": {
                         "type": "string",
-                        "description": "The exact class or function name to locate.",
+                        "description": "Class name, top-level function name, bare method name, or ClassName.method.",
                     }
                 },
                 "required": ["name"],
@@ -135,34 +135,55 @@ async def search_code(storage: LocalRepositoryStorage, query: str) -> list[dict[
     return results
 
 
-async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> list[dict[str, Any]]:
-    results: list[dict[str, Any]] = []
-    files = await storage.list_files()
-    python_files = [f for f in files if f.endswith(".py")]
+def _symbol_lookup_append(
+    results: list[dict[str, Any]],
+    file_path: str,
+    sym_type: str,
+    node: ast.AST,
+    **extra: Any,
+) -> bool:
+    """Append one match; return True when the list has 10 entries."""
+    results.append(
+        {
+            "file_path": file_path,
+            "type": sym_type,
+            "start_line": node.lineno,
+            "end_line": getattr(node, "end_lineno", node.lineno + 1),
+            **extra,
+        }
+    )
+    return len(results) >= 10
 
-    for file_path in python_files:
+
+async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> list[dict[str, Any]]:
+    """Module-level symbols and direct class methods."""
+    results: list[dict[str, Any]] = []
+    for file_path in [f for f in await storage.list_files() if f.endswith(".py")]:
         content = await storage.get_file_content(file_path)
         if not content:
             continue
-
         try:
             tree = ast.parse(content, filename=file_path)
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    if node.name == name:
-                        end_line = getattr(node, "end_lineno", node.lineno + 1)
-                        results.append(
-                            {
-                                "file_path": file_path,
-                                "type": "class" if isinstance(node, ast.ClassDef) else "function",
-                                "start_line": node.lineno,
-                                "end_line": end_line,
-                            }
-                        )
-                        if len(results) >= 10:
-                            return results
         except SyntaxError:
-            pass
+            continue
+        if not isinstance(tree, ast.Module):
+            continue
+
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.ClassDef):
+                if node.name == name and _symbol_lookup_append(results, file_path, "class", node):
+                    return results[:10]
+                for item in ast.iter_child_nodes(node):
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
+                        item.name == name or f"{node.name}.{item.name}" == name
+                    ):
+                        if _symbol_lookup_append(
+                            results, file_path, "method", item, class_name=node.name
+                        ):
+                            return results[:10]
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                if _symbol_lookup_append(results, file_path, "function", node):
+                    return results[:10]
 
     return results
 
