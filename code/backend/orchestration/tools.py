@@ -1,93 +1,9 @@
 import ast
-from typing import List, Dict, Optional, Any
+import json
+from typing import Any, Dict, List, Optional
+
 from repository.storage import LocalRepositoryStorage
 
-class RepositoryTools:
-    """Implementations for the four bounded agentic tools on a repository snapshot."""
-    
-    def __init__(self, repo_storage: LocalRepositoryStorage):
-        self.repo_storage = repo_storage
-        
-    async def list_files(self, path_prefix: Optional[str] = None) -> List[str]:
-        """Inspect the repository tree to find files matching path_prefix."""
-        files = await self.repo_storage.list_files(path_prefix)
-        return files[:50]  # Bound the maximum files returned
-
-    async def open_file(self, file_path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> str:
-        """Read an exact region of a repository file. If omitted, reads whole file."""
-        content = await self.repo_storage.get_file_content(file_path)
-        if content is None:
-            return f"Error: File '{file_path}' not found or unreadable."
-            
-        lines = content.splitlines()
-        
-        if start_line is None:
-            start_line = 1
-        if end_line is None:
-            end_line = len(lines)
-            
-        start_idx = max(0, start_line - 1)
-        end_idx = min(len(lines), end_line)
-        
-        chunk_lines = lines[start_idx:end_idx]
-        return "\n".join(chunk_lines)
-
-    async def search_code(self, query: str) -> List[Dict[str, Any]]:
-        """A simple exact-string match search across the local repository files."""
-        results = []
-        files = await self.repo_storage.list_files()
-        
-        for file_path in files:
-            content = await self.repo_storage.get_file_content(file_path)
-            if not content:
-                continue
-                
-            lines = content.splitlines()
-            for idx, line in enumerate(lines):
-                if query in line:
-                    results.append({
-                        "file_path": file_path,
-                        "line_number": idx + 1,
-                        "context": line.strip()
-                    })
-                    if len(results) >= 20: # Limit matched results
-                        return results
-        return results
-
-    async def symbol_lookup(self, name: str) -> List[Dict[str, Any]]:
-        """
-        Locate a class or function definition in the repository by name using Python's `ast`.
-        """
-        results = []
-        files = await self.repo_storage.list_files()
-        python_files = [f for f in files if f.endswith('.py')]
-        
-        for file_path in python_files:
-            content = await self.repo_storage.get_file_content(file_path)
-            if not content:
-                continue
-                
-            try:
-                tree = ast.parse(content, filename=file_path)
-                for node in ast.walk(tree):
-                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                        if node.name == name:
-                            # Try to find the docstring and endline
-                            end_line = getattr(node, 'end_lineno', node.lineno + 1)
-                            results.append({
-                                "file_path": file_path,
-                                "type": "class" if isinstance(node, ast.ClassDef) else "function",
-                                "start_line": node.lineno,
-                                "end_line": end_line,
-                            })
-                            if len(results) >= 10:
-                                return results
-            except SyntaxError:
-                pass  # Ignore files that fail to parse
-                
-        return results
-
-# Exposing OpenAI compatible tool function schemas
 TOOLS_SCHEMA = [
     {
         "type": "function",
@@ -99,12 +15,12 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "path_prefix": {
                         "type": "string",
-                        "description": "The optional directory prefix (e.g., 'src/backend')."
+                        "description": "The optional directory prefix (e.g., 'src/backend').",
                     }
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -116,20 +32,20 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "file_path": {
                         "type": "string",
-                        "description": "The relative file path."
+                        "description": "The relative file path.",
                     },
                     "start_line": {
                         "type": "integer",
-                        "description": "The first line to read (1-indexed)."
+                        "description": "The first line to read (1-indexed).",
                     },
                     "end_line": {
                         "type": "integer",
-                        "description": "The last line to read (inclusive)."
-                    }
+                        "description": "The last line to read (inclusive).",
+                    },
                 },
-                "required": ["file_path"]
-            }
-        }
+                "required": ["file_path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -141,12 +57,12 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The exact string or identifier to search for."
+                        "description": "The exact string or identifier to search for.",
                     }
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -158,11 +74,124 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "name": {
                         "type": "string",
-                        "description": "The exact class or function name to locate."
+                        "description": "The exact class or function name to locate.",
                     }
                 },
-                "required": ["name"]
-            }
-        }
-    }
+                "required": ["name"],
+            },
+        },
+    },
 ]
+
+
+async def list_files(
+    storage: LocalRepositoryStorage, path_prefix: Optional[str] = None
+) -> List[str]:
+    files = await storage.list_files(path_prefix)
+    return files[:50]
+
+
+async def open_file(
+    storage: LocalRepositoryStorage,
+    file_path: str,
+    start_line: Optional[int] = None,
+    end_line: Optional[int] = None,
+) -> str:
+    content = await storage.get_file_content(file_path)
+    if content is None:
+        return f"Error: File '{file_path}' not found or unreadable."
+
+    lines = content.splitlines()
+    if start_line is None:
+        start_line = 1
+    if end_line is None:
+        end_line = len(lines)
+
+    start_idx = max(0, start_line - 1)
+    end_idx = min(len(lines), end_line)
+    return "\n".join(lines[start_idx:end_idx])
+
+
+async def search_code(storage: LocalRepositoryStorage, query: str) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
+    files = await storage.list_files()
+
+    for file_path in files:
+        content = await storage.get_file_content(file_path)
+        if not content:
+            continue
+
+        for idx, line in enumerate(content.splitlines()):
+            if query in line:
+                results.append(
+                    {
+                        "file_path": file_path,
+                        "line_number": idx + 1,
+                        "context": line.strip(),
+                    }
+                )
+                if len(results) >= 20:
+                    return results
+    return results
+
+
+async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> List[Dict[str, Any]]:
+    results: List[Dict[str, Any]] = []
+    files = await storage.list_files()
+    python_files = [f for f in files if f.endswith(".py")]
+
+    for file_path in python_files:
+        content = await storage.get_file_content(file_path)
+        if not content:
+            continue
+
+        try:
+            tree = ast.parse(content, filename=file_path)
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    if node.name == name:
+                        end_line = getattr(node, "end_lineno", node.lineno + 1)
+                        results.append(
+                            {
+                                "file_path": file_path,
+                                "type": "class" if isinstance(node, ast.ClassDef) else "function",
+                                "start_line": node.lineno,
+                                "end_line": end_line,
+                            }
+                        )
+                        if len(results) >= 10:
+                            return results
+        except SyntaxError:
+            pass
+
+    return results
+
+
+_TOOL_HANDLERS = {
+    "list_files": list_files,
+    "open_file": open_file,
+    "search_code": search_code,
+    "symbol_lookup": symbol_lookup,
+}
+
+
+async def execute_tool_call(storage: LocalRepositoryStorage, call: Dict[str, Any]) -> str:
+    func_name = call.get("function", {}).get("name")
+    args_str = call.get("function", {}).get("arguments", "{}")
+
+    try:
+        kwargs = json.loads(args_str)
+    except json.JSONDecodeError:
+        return f"Error: Failed to parse tool arguments: {args_str}"
+
+    handler = _TOOL_HANDLERS.get(func_name)
+    if not handler:
+        return f"Error: Tool '{func_name}' is not recognized."
+
+    try:
+        result = await handler(storage, **kwargs)
+        return json.dumps(result, indent=2) if isinstance(result, (list, dict)) else str(result)
+    except TypeError as e:
+        return f"Error: invalid arguments for {func_name}: {e}"
+    except Exception as e:
+        return f"Error executing tool {func_name}: {str(e)}"

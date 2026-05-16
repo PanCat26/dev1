@@ -15,7 +15,7 @@ from repository_management.crud import (
     get_repository,
 )
 from api.schemas import ConversationOut, MessageCreateIn, MessageOut
-from orchestration.service import OrchestrationService
+from orchestration.service import answer_query
 
 router = APIRouter(tags=["conversations"])
 
@@ -134,20 +134,20 @@ async def conversation_websocket(
         
     try:
         while True:
+            
             data = await websocket.receive_text()
             
             # Save user query
             await run_in_threadpool(create_message, db, conv_id, "user", data)
             await run_in_threadpool(db.commit)
             
-            service = OrchestrationService(
-                repo_id=str(repo.id),
-                commit_sha=repo.commit_sha,
-                snapshot_path=repo.snapshot_path
-            )
-            
             full_answer = ""
-            async for chunk in service.answer_query(data):
+            async for chunk in answer_query(
+                str(repo.id),
+                repo.commit_sha,
+                repo.snapshot_path,
+                data,
+            ):
                 await websocket.send_text(chunk)
                 try:
                     event = json.loads(chunk)
