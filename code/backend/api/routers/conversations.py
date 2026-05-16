@@ -143,12 +143,6 @@ def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
 
 
 def _ws_fetch_bounded_history(conv_id: uuid.UUID) -> list[dict[str, str]]:
-    """Return prior user/assistant turns for the model (excludes the latest user row).
-
-    The socket handler persists the current user message before calling this; that
-    row must not appear again in history because ``answer_query`` appends the same
-    text as the active user turn.
-    """
     db = SessionLocal()
     try:
         msgs = get_messages(db, conv_id)

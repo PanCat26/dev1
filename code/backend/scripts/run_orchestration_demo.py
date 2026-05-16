@@ -26,7 +26,6 @@ def _ws_uri(conv_id: str, host: str, port: int) -> str:
 
 
 async def _consume_turn(ws, query: str) -> None:
-    """Read events for one user message until done, error, or connection closes."""
     await ws.send(query)
     print(f"\n> {query}\n")
 

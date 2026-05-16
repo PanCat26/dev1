@@ -2,7 +2,7 @@ from retrieval.types import EvidencePackage
 
 
 def assemble_evidence_package(evidence_pkg: EvidencePackage) -> str:
-    """Format vector-retrieval chunks into a single string for the system prompt."""
+    """Turn retrieval chunks into one text block for the system prompt."""
     evidence_blocks: list[str] = []
 
     if evidence_pkg.total_chunks > 0:
@@ -26,7 +26,7 @@ def assemble_evidence_package(evidence_pkg: EvidencePackage) -> str:
 
 
 def build_system_prompt(evidence_package: str) -> str:
-    """Build system prompt with hallucination / tool-use instructions plus evidence."""
+    """System prompt: tool rules plus embedded evidence."""
     system_message = (
         "You are an expert Python coding assistant specifically designed to help users with the currently active repository.\n"
         "You have access to a set of repository inspection tools. If the initial retrieved evidence does not contain enough information to form a conclusive technical answer, you MUST use your tools to explore the codebase (for example, by listing files, opening files, or searching code).\n"

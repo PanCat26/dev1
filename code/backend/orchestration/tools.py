@@ -142,7 +142,6 @@ def _symbol_lookup_append(
     node: ast.AST,
     **extra: Any,
 ) -> bool:
-    """Append one match; return True when the list has 10 entries."""
     results.append(
         {
             "file_path": file_path,
@@ -156,7 +155,7 @@ def _symbol_lookup_append(
 
 
 async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> list[dict[str, Any]]:
-    """Module-level symbols and direct class methods."""
+    """Top-level defs and class methods (same idea as the indexer)."""
     results: list[dict[str, Any]] = []
     for file_path in [f for f in await storage.list_files() if f.endswith(".py")]:
         content = await storage.get_file_content(file_path)

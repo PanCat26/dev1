@@ -26,11 +26,7 @@ async def answer_query(
     user_query: str,
     history_messages: list[dict[str, str]] | None = None,
 ) -> AsyncGenerator[str, None]:
-    """Retrieve context, run bounded tool-calling loop, stream JSON lines.
-
-    ``history_messages`` must be prior turns only (user/assistant). The current
-    ``user_query`` is appended once as the latest user message.
-    """
+    """Stream retrieval, tools, and model output."""
     user_query = user_query.strip()
     if not user_query:
         yield json.dumps({"type": "error", "message": "Empty message."})

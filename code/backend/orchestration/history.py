@@ -1,5 +1,3 @@
-"""Bounded conversation history for the LLM."""
-
 from typing import Any, Sequence
 
 # Last N rows from DB (user + assistant only), after filtering.
