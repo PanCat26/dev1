@@ -14,11 +14,6 @@ def bounded_history_for_llm(messages: Sequence[Any]) -> list[dict[str, str]]:
     """
     Turn persisted messages (ORM or any object with .role and .content) into
     OpenAI-style {"role","content"} dicts for the chat API.
-
-    Policy: take the last MAX_HISTORY_MESSAGES entries whose role is user or
-    assistant; truncate each body to MAX_MESSAGE_CHARS; if the combined
-    length exceeds MAX_HISTORY_TOTAL_CHARS, drop from the oldest until under
-    the cap (most recent turns kept).
     """
     allowed = {"user", "assistant"}
     filtered = [m for m in messages if getattr(m, "role", None) in allowed]

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import re
 import uuid
 from typing import Any, AsyncGenerator
 
@@ -13,6 +12,13 @@ from repository.storage import LocalRepositoryStorage
 MAX_AGENT_STEPS = 10
 
 
+def _ensure_tool_call_ids(tool_calls: list[dict[str, Any]]) -> None:
+    for call in tool_calls:
+        if not call.get("id"):
+            call["id"] = f"call_{uuid.uuid4().hex[:16]}"
+        call.setdefault("type", "function")
+
+
 async def answer_query(
     repo_id: str,
     commit_sha: str,
@@ -20,26 +26,39 @@ async def answer_query(
     user_query: str,
     history_messages: list[dict[str, str]] | None = None,
 ) -> AsyncGenerator[str, None]:
-    """Retrieve context, run bounded tool-calling loop, stream JSON events."""
+    """Retrieve context, run bounded tool-calling loop, stream JSON lines.
+
+    ``history_messages`` must be prior turns only (user/assistant). The current
+    ``user_query`` is appended once as the latest user message.
+    """
+    user_query = user_query.strip()
+    if not user_query:
+        yield json.dumps({"type": "error", "message": "Empty message."})
+        return
+
     yield json.dumps({"type": "status", "message": "Retrieving semantic context..."})
 
     storage = LocalRepositoryStorage(snapshot_path)
 
-    evidence_pkg = await asyncio.to_thread(
-        retrieval_service.retrieve_for_query,
-        query=user_query,
-        repo_id=repo_id,
-        commit_sha=commit_sha,
-    )
+    try:
+        evidence_pkg = await asyncio.to_thread(
+            retrieval_service.retrieve_for_query,
+            query=user_query,
+            repo_id=repo_id,
+            commit_sha=commit_sha,
+        )
+    except ValueError as e:
+        yield json.dumps({"type": "error", "message": str(e)})
+        return
+
     evidence_pkg_str = assemble_evidence_package(evidence_pkg)
     system_prompt = build_system_prompt(evidence_pkg_str)
 
-    prior_turns = history_messages if history_messages else [
-        {"role": "user", "content": user_query},
-    ]
+    prior = list(history_messages or [])
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
-        *prior_turns,
+        *prior,
+        {"role": "user", "content": user_query},
     ]
 
     for step in range(MAX_AGENT_STEPS):
@@ -55,32 +74,12 @@ async def answer_query(
             elif event["type"] == "tool_calls":
                 tool_calls = event["tool_calls"]
 
-        if not tool_calls and assistant_content:
-            pattern = r'\{\s*"name"\s*:\s*"[^"]+"\s*,\s*"arguments"\s*:\s*\{.*?\}\s*\}'
-            for m in re.finditer(pattern, assistant_content, re.DOTALL):
-                try:
-                    call_dict = json.loads(m.group(0))
-                    if "name" in call_dict and "arguments" in call_dict:
-                        tool_calls.append(
-                            {
-                                "id": f"call_{uuid.uuid4().hex[:8]}",
-                                "type": "function",
-                                "function": {
-                                    "name": call_dict["name"],
-                                    "arguments": json.dumps(call_dict["arguments"])
-                                    if isinstance(call_dict["arguments"], dict)
-                                    else str(call_dict["arguments"]),
-                                },
-                            }
-                        )
-                except (json.JSONDecodeError, TypeError, KeyError):
-                    pass
-
         assistant_message: dict[str, Any] = {"role": "assistant"}
         if assistant_content:
             assistant_message["content"] = assistant_content
 
         if tool_calls:
+            _ensure_tool_call_ids(tool_calls)
             assistant_message["tool_calls"] = tool_calls
             messages.append(assistant_message)
 
@@ -102,7 +101,12 @@ async def answer_query(
                     }
                 )
         else:
-            messages.append(assistant_message)
+            if assistant_content.strip():
+                messages.append(assistant_message)
+                return
+            yield json.dumps(
+                {"type": "error", "message": "Model returned no text and no tool calls."}
+            )
             return
 
     yield json.dumps({"type": "status", "message": "Finalizing answer without tools..."})

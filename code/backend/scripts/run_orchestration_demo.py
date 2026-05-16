@@ -49,7 +49,9 @@ async def _consume_turn(ws, query: str) -> None:
         elif t == "status":
             print(f"\n[status] {event.get('message')}")
         elif t == "tool_call":
-            print(f"\n[tool_call] {event.get('name')}({event.get('arguments')})")
+            tid = event.get("id")
+            prefix = f"{tid} " if tid else ""
+            print(f"\n[tool_call] {prefix}{event.get('name')}({event.get('arguments')})")
         elif t == "done":
             print("\n\n[done]")
             return

@@ -37,7 +37,11 @@ async def generate(
     tool_calls_dict: dict[int, dict] = {}
 
     async for chunk in stream:
+        if not chunk.choices:
+            continue
         delta = chunk.choices[0].delta
+        if delta is None:
+            continue
 
         if delta.content:
             yield {"type": "content", "content": delta.content}

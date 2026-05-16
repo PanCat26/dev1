@@ -143,9 +143,18 @@ def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
 
 
 def _ws_fetch_bounded_history(conv_id: uuid.UUID) -> list[dict[str, str]]:
+    """Return prior user/assistant turns for the model (excludes the latest user row).
+
+    The socket handler persists the current user message before calling this; that
+    row must not appear again in history because ``answer_query`` appends the same
+    text as the active user turn.
+    """
     db = SessionLocal()
     try:
-        return bounded_history_for_llm(get_messages(db, conv_id))
+        msgs = get_messages(db, conv_id)
+        if msgs and getattr(msgs[-1], "role", None) == "user":
+            msgs = msgs[:-1]
+        return bounded_history_for_llm(msgs)
     finally:
         db.close()
 
@@ -157,6 +166,13 @@ async def conversation_websocket(
 ):
     await websocket.accept()
 
+    async def _safe_send(text: str) -> bool:
+        try:
+            await websocket.send_text(text)
+            return True
+        except Exception:
+            return False
+
     ctx = await run_in_threadpool(_ws_fetch_repo_context, conv_id)
     if ctx is None:
         await websocket.close(
@@ -167,16 +183,12 @@ async def conversation_websocket(
 
     repo_id, commit_sha, snapshot_path = ctx
 
-    async def _safe_send(text: str) -> bool:
-        try:
-            await websocket.send_text(text)
-            return True
-        except Exception:
-            return False
-
     try:
         while True:
-            data = await websocket.receive_text()
+            data = (await websocket.receive_text()).strip()
+            if not data:
+                await _safe_send(json.dumps({"type": "error", "message": "Empty message."}))
+                continue
 
             try:
                 await run_in_threadpool(_ws_persist_message, conv_id, "user", data)
@@ -225,7 +237,7 @@ async def conversation_websocket(
         pass
     except Exception as e:
         try:
-            await websocket.send_text(json.dumps({"type": "error", "message": str(e)}))
+            await _safe_send(json.dumps({"type": "error", "message": str(e)}))
             await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
         except Exception:
             pass
