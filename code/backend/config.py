@@ -16,3 +16,4 @@ SNAPSHOTS_DIR = os.getenv("SNAPSHOTS_DIR", os.path.join(os.path.dirname(__file__
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", None)
 
 LLAMA_SERVER_URL = os.getenv("LLAMA_SERVER_URL", "http://localhost:8080")
+LLAMA_MODEL = os.getenv("LLAMA_MODEL", "qwen2.5-coder-7b-q4_k_m.gguf")

@@ -16,8 +16,11 @@ async def test_streaming(prompt: str):
     print(f"Prompt: {prompt}")
     print("Response: ", end="", flush=True)
 
-    async for token in generate(messages, max_tokens=256):
-        print(token, end="", flush=True)
+    async for event in generate(messages, max_tokens=256):
+        if event.get("type") == "content":
+            print(event.get("content", ""), end="", flush=True)
+        elif event.get("type") == "tool_calls":
+            print(f"\n[tool_calls] {event.get('tool_calls')}", end="", flush=True)
 
     print("\n\nDone.")
 

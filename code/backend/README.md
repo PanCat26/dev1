@@ -75,11 +75,14 @@ EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
 DATABASE_URL=postgresql://dev1:dev1@127.0.0.1:5433/dev1db
 GITHUB_TOKEN=<your-github-api-token>
 LLAMA_SERVER_URL=http://localhost:8080
+LLAMA_MODEL=qwen2.5-coder-7b-q4_k_m.gguf
 ```
 
 Most variables have defaults, so `.env` is generally optional for local development. However, `GITHUB_TOKEN` does not have a default value; if it is not provided, you might encounter GitHub API rate limits during repository ingestion.
 
-Override the default for `LLAMA_SERVER_URL` it if your llama-server runs on a different port.
+Override the default for `LLAMA_SERVER_URL` if your llama-server runs on a different port.
+
+Set `LLAMA_MODEL` to a model id your llama-server accepts for `POST /v1/chat/completions` (see `GET <LLAMA_SERVER_URL>/v1/models`, e.g. `http://127.0.0.1:8080/v1/models`). The default in `config.py` is `qwen2.5-coder-7b-q4_k_m.gguf`; change it if your server registers a different id.
 
 ## Start Services (PostgreSQL & Qdrant)
 
@@ -217,3 +220,21 @@ python scripts/run_language_model_demo.py <prompt>
 ```
 
 If no prompt is provided, a default one is used. The script streams the model's response token by token to the terminal.
+
+## Run the orchestration WebSocket demo
+
+This script talks to the **running API** over the conversation WebSocket (`/conversations/{conv_id}/ws`): it sends your message, prints streamed status/content/tool calls, and exits when the server sends `done`. Use it to exercise retrieval + agent tools end-to-end.
+
+Prerequisites: **uvicorn** is up (see above), Postgres is up, and you have a **conversation id** for an existing conversation (create one via `POST /repositories/{repo_id}/conversations` in Swagger, or copy a UUID you already have).
+
+With the virtual environment activated, from `code/backend`:
+
+```bash
+python scripts/run_orchestration_demo.py <conv_id>
+```
+
+Optional one-shot question (non-interactive):
+
+```bash
+python scripts/run_orchestration_demo.py <conv_id> "Your question here"
+```
