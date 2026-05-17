@@ -15,7 +15,7 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "path_prefix": {
                         "type": "string",
-                        "description": "The optional directory prefix (e.g., 'src/backend').",
+                        "description": "Optional directory prefix using forward slashes (e.g. 'test/', 'src/'). Works on Windows and Unix.",
                     }
                 },
                 "required": [],
@@ -26,7 +26,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "open_file",
-            "description": "Read exact regions from the repository given a file path and optional line limits. Useful to inspect definitions and code surrounding symbols.",
+            "description": "Read exact regions from the repository given a file path and optional line limits. Useful to inspect definitions and code surrounding symbols. Each returned line is prefixed with its 1-based line number and a pipe (LINE|content).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -51,14 +51,18 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "search_code",
-            "description": "Search code text for exact names, strings, or identifiers across the repository.",
+            "description": "Search code text for exact names, strings, or identifiers. Prefer path_prefix when the user asked about a specific folder (e.g. tests under test/).",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
                         "description": "The exact string or identifier to search for.",
-                    }
+                    },
+                    "path_prefix": {
+                        "type": "string",
+                        "description": "If set, only search files under this path (forward slashes, e.g. 'test/'). Omit to search the whole repo.",
+                    },
                 },
                 "required": ["query"],
             },
@@ -84,10 +88,15 @@ TOOLS_SCHEMA = [
 ]
 
 
+def _normalize_path_prefix(path_prefix: str | None) -> str | None:
+    p = (path_prefix or "").replace("\\", "/").strip()
+    return p or None
+
+
 async def list_files(
     storage: LocalRepositoryStorage, path_prefix: str | None = None
 ) -> list[str]:
-    files = await storage.list_files(path_prefix)
+    files = await storage.list_files(_normalize_path_prefix(path_prefix))
     return files[:50]
 
 
@@ -109,12 +118,23 @@ async def open_file(
 
     start_idx = max(0, start_line - 1)
     end_idx = min(len(lines), end_line)
-    return "\n".join(lines[start_idx:end_idx])
+    if start_idx >= len(lines) or start_idx >= end_idx:
+        return f"Error: Invalid line range {start_line}-{end_line} (file has {len(lines)} lines)."
+
+    numbered: list[str] = []
+    for i in range(start_idx, end_idx):
+        line_no = i + 1
+        numbered.append(f"{line_no:5d}|{lines[i]}")
+    return "\n".join(numbered)
 
 
-async def search_code(storage: LocalRepositoryStorage, query: str) -> list[dict[str, Any]]:
+async def search_code(
+    storage: LocalRepositoryStorage,
+    query: str,
+    path_prefix: str | None = None,
+) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    files = await storage.list_files()
+    files = await storage.list_files(_normalize_path_prefix(path_prefix))
 
     for file_path in files:
         content = await storage.get_file_content(file_path)

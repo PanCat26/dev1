@@ -31,12 +31,15 @@ def build_system_prompt(evidence_package: str) -> str:
         "You are an expert Python coding assistant specifically designed to help users with the currently active repository.\n"
         "You have access to a set of repository inspection tools. If the initial retrieved evidence does not contain enough information to form a conclusive technical answer, you MUST use your tools to explore the codebase (for example, by listing files, opening files, or searching code).\n"
         "Only after you have exhausted your tools and still cannot find the answer should you return an explicit insufficient-evidence response.\n"
-        "Do not hallucinate files, names, or code regions. Always cite the file path and line numbers when referring to code.\n\n"
+        "Do not hallucinate files, names, or code regions. Always cite the file path and line numbers when referring to code.\n"
+        "You invoke tools yourself in this chat; never ask the user to run tools, paste JSON, or call APIs for you.\n\n"
         "The following initial evidence has been collected for the user's query:\n\n"
     )
 
     return (
         system_message
         + evidence_package
-        + "\n\nCRITICAL: Think step by step. Use your tools to find the answer if it's missing in the initial evidence."
+        + "\n\nCRITICAL: Think step by step. Use your tools to find the answer if it's missing in the initial evidence. "
+        "If you need more than the snippets above, call your tools now—do not only describe what someone could run. "
+        "Do not tell the user how they could search the repo; you search it and report results."
     )

@@ -6,6 +6,17 @@ import sys
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+_WS_CONNECT_KWARGS = {
+    "ping_interval": 30,
+    "ping_timeout": 300,
+    "close_timeout": 60,
+}
+
+
+async def _input_nonblocking(prompt: str) -> str:
+    """Threaded ``input`` so the asyncio loop can still answer WebSocket pings."""
+    return (await asyncio.to_thread(input, prompt)).strip()
+
 
 def _usage() -> str:
     return (
@@ -27,7 +38,7 @@ def _ws_uri(conv_id: str, host: str, port: int) -> str:
 
 async def _consume_turn(ws, query: str) -> None:
     await ws.send(query)
-    print(f"\n> {query}\n")
+    print(f"\n> {query}\n", flush=True)
 
     while True:
         try:
@@ -46,7 +57,7 @@ async def _consume_turn(ws, query: str) -> None:
         if t == "content":
             print(event.get("delta", ""), end="", flush=True)
         elif t == "status":
-            print(f"\n[status] {event.get('message')}")
+            print(f"\n[status] {event.get('message')}", flush=True)
         elif t == "tool_call":
             tid = event.get("id")
             prefix = f"{tid} " if tid else ""
@@ -64,7 +75,7 @@ async def _consume_turn(ws, query: str) -> None:
 async def one_shot(conv_id: str, query: str, host: str, port: int) -> None:
     uri = _ws_uri(conv_id, host, port)
     print(f"Connecting to {uri}\n")
-    async with websockets.connect(uri) as ws:
+    async with websockets.connect(uri, **_WS_CONNECT_KWARGS) as ws:
         try:
             await _consume_turn(ws, query)
         except ConnectionClosed:
@@ -74,10 +85,10 @@ async def one_shot(conv_id: str, query: str, host: str, port: int) -> None:
 async def interactive(conv_id: str, host: str, port: int) -> None:
     uri = _ws_uri(conv_id, host, port)
     print(f"Connecting to {uri} … (quit or exit to stop)\n")
-    async with websockets.connect(uri) as ws:
+    async with websockets.connect(uri, **_WS_CONNECT_KWARGS) as ws:
         while True:
             try:
-                query = input("User> ").strip()
+                query = await _input_nonblocking("User> ")
             except (EOFError, KeyboardInterrupt):
                 print()
                 return

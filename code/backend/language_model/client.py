@@ -26,6 +26,7 @@ async def generate(
     }
     if tools:
         kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
 
     stream = await client.chat.completions.create(**kwargs)
     tool_parts: dict[int, dict] = {}

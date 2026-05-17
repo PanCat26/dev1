@@ -13,13 +13,15 @@ class LocalRepositoryStorage:
         
     def _list_files_sync(self, path_prefix: Optional[str] = None) -> List[str]:
         files = []
+        prefix = (path_prefix or "").replace("\\", "/").strip()
         for root, _, filenames in os.walk(self.base_dir):
             for filename in filenames:
                 if '.git' in root or '__pycache__' in root:
                     continue
                 rel_path = os.path.relpath(os.path.join(root, filename), self.base_dir)
-                if not path_prefix or rel_path.startswith(path_prefix):
-                    files.append(rel_path)
+                rel_posix = rel_path.replace("\\", "/")
+                if not prefix or rel_posix.startswith(prefix):
+                    files.append(rel_posix)
         return sorted(files)
 
     async def list_files(self, path_prefix: Optional[str] = None) -> List[str]:
@@ -27,7 +29,11 @@ class LocalRepositoryStorage:
         return await asyncio.to_thread(self._list_files_sync, path_prefix)
         
     def _get_file_content_sync(self, file_path: str) -> Optional[str]:
-        full_path = self.base_dir / file_path
+        full_path = (self.base_dir / file_path.replace("\\", "/")).resolve()
+        try:
+            full_path.relative_to(self.base_dir.resolve())
+        except ValueError:
+            return None
         if not full_path.is_file():
             return None
         try:
