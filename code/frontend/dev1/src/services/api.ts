@@ -50,6 +50,13 @@ export const api = {
     return res.json();
   },
 
+  deleteRepository: async (repo_id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/repositories/${repo_id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete repository');
+  },
+
   getConversations: async (repo_id: string): Promise<ConversationOut[]> => {
     const res = await fetch(`${API_BASE}/repositories/${repo_id}/conversations`);
     if (!res.ok) throw new Error('Failed to fetch conversations');
@@ -62,6 +69,13 @@ export const api = {
     });
     if (!res.ok) throw new Error('Failed to create conversation');
     return res.json();
+  },
+
+  deleteConversation: async (conv_id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/conversations/${conv_id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete conversation');
   },
 
   getMessages: async (conv_id: string): Promise<MessageOut[]> => {
