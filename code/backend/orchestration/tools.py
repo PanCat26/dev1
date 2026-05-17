@@ -155,25 +155,6 @@ async def search_code(
     return results
 
 
-def _symbol_lookup_append(
-    results: list[dict[str, Any]],
-    file_path: str,
-    sym_type: str,
-    node: ast.AST,
-    **extra: Any,
-) -> bool:
-    results.append(
-        {
-            "file_path": file_path,
-            "type": sym_type,
-            "start_line": node.lineno,
-            "end_line": getattr(node, "end_lineno", node.lineno + 1),
-            **extra,
-        }
-    )
-    return len(results) >= 10
-
-
 async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> list[dict[str, Any]]:
     """Top-level defs and class methods (same idea as the indexer)."""
     results: list[dict[str, Any]] = []
@@ -190,19 +171,43 @@ async def symbol_lookup(storage: LocalRepositoryStorage, name: str) -> list[dict
 
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, ast.ClassDef):
-                if node.name == name and _symbol_lookup_append(results, file_path, "class", node):
-                    return results[:10]
+                if node.name == name:
+                    results.append(
+                        {
+                            "file_path": file_path,
+                            "type": "class",
+                            "start_line": node.lineno,
+                            "end_line": getattr(node, "end_lineno", node.lineno + 1),
+                        }
+                    )
+                    if len(results) >= 10:
+                        return results
                 for item in ast.iter_child_nodes(node):
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and (
                         item.name == name or f"{node.name}.{item.name}" == name
                     ):
-                        if _symbol_lookup_append(
-                            results, file_path, "method", item, class_name=node.name
-                        ):
-                            return results[:10]
+                        results.append(
+                            {
+                                "file_path": file_path,
+                                "type": "method",
+                                "start_line": item.lineno,
+                                "end_line": getattr(item, "end_lineno", item.lineno + 1),
+                                "class_name": node.name,
+                            }
+                        )
+                        if len(results) >= 10:
+                            return results
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
-                if _symbol_lookup_append(results, file_path, "function", node):
-                    return results[:10]
+                results.append(
+                    {
+                        "file_path": file_path,
+                        "type": "function",
+                        "start_line": node.lineno,
+                        "end_line": getattr(node, "end_lineno", node.lineno + 1),
+                    }
+                )
+                if len(results) >= 10:
+                    return results
 
     return results
 
@@ -217,7 +222,13 @@ _TOOL_HANDLERS = {
 
 async def execute_tool_call(storage: LocalRepositoryStorage, call: dict[str, Any]) -> str:
     func_name = call.get("function", {}).get("name")
-    args_str = call.get("function", {}).get("arguments", "{}")
+    raw = call.get("function", {}).get("arguments")
+    if isinstance(raw, str):
+        args_str = raw.strip() or "{}"
+    elif raw is None:
+        args_str = "{}"
+    else:
+        args_str = json.dumps(raw)
 
     try:
         kwargs = json.loads(args_str)

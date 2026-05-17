@@ -114,22 +114,6 @@ def create_message_endpoint(
     return _msg_to_out(msg)
 
 
-def _ws_fetch_repo_context(conv_id: uuid.UUID) -> tuple[str, str, str] | None:
-    """Load repo id / commit / snapshot path in one short session. Returns None if
-    conversation or repository is missing."""
-    db = SessionLocal()
-    try:
-        conv = get_conversation(db, conv_id)
-        if not conv:
-            return None
-        repo = get_repository(db, conv.repository_id)
-        if not repo:
-            return None
-        return (str(repo.id), repo.commit_sha, repo.snapshot_path)
-    finally:
-        db.close()
-
-
 def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
     db = SessionLocal()
     try:
@@ -142,13 +126,22 @@ def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
         db.close()
 
 
-def _ws_fetch_bounded_history(conv_id: uuid.UUID) -> list[dict[str, str]]:
+def _ws_load_repo_context_and_history(
+    conv_id: uuid.UUID,
+) -> tuple[tuple[str, str, str], list[dict[str, str]]] | None:
+    """One DB session: fresh repo id/commit/snapshot plus bounded history (before this turn's user row)."""
     db = SessionLocal()
     try:
+        conv = get_conversation(db, conv_id)
+        if not conv:
+            return None
+        repo = get_repository(db, conv.repository_id)
+        if not repo:
+            return None
         msgs = get_messages(db, conv_id)
-        if msgs and getattr(msgs[-1], "role", None) == "user":
-            msgs = msgs[:-1]
-        return bounded_history_for_llm(msgs)
+        history = bounded_history_for_llm(msgs)
+        ctx = (str(repo.id), repo.commit_sha, repo.snapshot_path)
+        return (ctx, history)
     finally:
         db.close()
 
@@ -167,22 +160,26 @@ async def conversation_websocket(
         except Exception:
             return False
 
-    ctx = await run_in_threadpool(_ws_fetch_repo_context, conv_id)
-    if ctx is None:
-        await websocket.close(
-            code=status.WS_1008_POLICY_VIOLATION,
-            reason="Conversation or repository not found",
-        )
-        return
-
-    repo_id, commit_sha, snapshot_path = ctx
-
     try:
         while True:
             data = (await websocket.receive_text()).strip()
             if not data:
                 await _safe_send(json.dumps({"type": "error", "message": "Empty message."}))
                 continue
+
+            try:
+                loaded = await run_in_threadpool(_ws_load_repo_context_and_history, conv_id)
+            except Exception as e:
+                await _safe_send(
+                    json.dumps({"type": "error", "message": f"Failed to load conversation context: {e}"})
+                )
+                continue
+            if loaded is None:
+                await _safe_send(
+                    json.dumps({"type": "error", "message": "Conversation or repository not found."})
+                )
+                continue
+            (repo_id, commit_sha, snapshot_path), history_messages = loaded
 
             try:
                 await run_in_threadpool(_ws_persist_message, conv_id, "user", data)
@@ -192,30 +189,30 @@ async def conversation_websocket(
                 )
                 continue
 
-            history_messages = await run_in_threadpool(_ws_fetch_bounded_history, conv_id)
-
             full_answer = ""
-            gen = answer_query(
-                repo_id,
-                commit_sha,
-                snapshot_path,
-                data,
-                history_messages=history_messages,
-            )
+            gen = None
             try:
+                gen = answer_query(
+                    repo_id,
+                    commit_sha,
+                    snapshot_path,
+                    data,
+                    history_messages=history_messages,
+                )
                 async for chunk in gen:
                     if not await _safe_send(chunk):
                         break
                     try:
                         event = json.loads(chunk)
                         if event.get("type") == "content":
-                            full_answer += event.get("delta", "")
+                            full_answer += event.get("delta", "") or ""
                     except json.JSONDecodeError:
                         pass
             except Exception as e:
                 await _safe_send(json.dumps({"type": "error", "message": f"Generation failed: {e}"}))
             finally:
-                await gen.aclose()
+                if gen is not None:
+                    await gen.aclose()
 
             if full_answer:
                 try:

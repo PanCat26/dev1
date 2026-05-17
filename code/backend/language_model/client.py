@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -17,7 +18,7 @@ async def generate(
     tools: list[dict] | None = None,
 ) -> AsyncIterator[dict]:
     """Yield ``{type, content}`` chunks, then ``{type, tool_calls}`` once at end if needed."""
-    kwargs: dict = {
+    kwargs: dict[str, Any] = {
         "model": config.LLAMA_MODEL,
         "messages": messages,
         "temperature": temperature,
