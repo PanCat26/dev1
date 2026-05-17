@@ -12,6 +12,7 @@ export function ProjectView() {
   const [conversations, setConversations] = useState<ConversationOut[]>([]);
   const [chatNames, setChatNames] = useState<Record<string, string>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [isCreatingChat, setIsCreatingChat] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,12 +71,14 @@ export function ProjectView() {
   };
 
   const handleNewChat = async () => {
-    if (!id) return;
+    if (!id || isCreatingChat) return;
+    setIsCreatingChat(true);
     try {
       const newConv = await api.createConversation(id);
       navigate(`/project/${id}/chat/${newConv.id}`);
     } catch (e) {
       console.error('Failed to create chat', e);
+      setIsCreatingChat(false);
     }
   };
 
@@ -132,8 +135,8 @@ export function ProjectView() {
       <div className="project-content">
         <div className="conversations-header">
           <h2>Your Chats</h2>
-          <button className="button primary" onClick={handleNewChat}>
-            <Plus size={16} /> New Chat
+          <button className="button primary" onClick={handleNewChat} disabled={isCreatingChat}>
+            <Plus size={16} /> {isCreatingChat ? 'Creating...' : 'New Chat'}
           </button>
         </div>
 

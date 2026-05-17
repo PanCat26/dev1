@@ -37,6 +37,7 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ github_url }),
+      signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error('Failed to add repository');
     return res.json();
@@ -45,6 +46,7 @@ export const api = {
   refreshRepository: async (repo_id: string): Promise<{ updated: boolean }> => {
     const res = await fetch(`${API_BASE}/repositories/${repo_id}/refresh`, {
       method: 'POST',
+      signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) throw new Error('Failed to refresh repository');
     return res.json();
@@ -66,6 +68,7 @@ export const api = {
   createConversation: async (repo_id: string): Promise<ConversationOut> => {
     const res = await fetch(`${API_BASE}/repositories/${repo_id}/conversations`, {
       method: 'POST',
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) throw new Error('Failed to create conversation');
     return res.json();

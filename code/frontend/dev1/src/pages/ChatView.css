@@ -91,6 +91,9 @@
   padding: 1rem 1.25rem;
   border-radius: 12px;
   line-height: 1.6;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .message-wrapper.user .message-content {
@@ -117,6 +120,7 @@
   border-radius: 8px;
   overflow-x: auto;
   margin: 0.75rem 0;
+  max-width: 100%;
 }
 .message-content code {
   background-color: rgba(0,0,0,0.3);
