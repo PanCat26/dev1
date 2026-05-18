@@ -111,11 +111,42 @@ async def answer_query(
 
         tool_calls: list[dict[str, Any]] = []
         assistant_content = ""
+        
+        import random
+        from config import RLHF_PROBABILITY
+        
+        is_rlhf = random.random() < RLHF_PROBABILITY
+        rlhf_started = False
+        gen2_task = None
+        gen2_queue = asyncio.Queue()
+        assistant_content_alt = ""
+
+        async def run_gen2():
+            try:
+                async for ev in llm_client.generate(messages, tools=None):
+                    if ev["type"] == "content":
+                        await gen2_queue.put(ev["content"])
+            except Exception:
+                pass
+            finally:
+                await gen2_queue.put(None)
 
         async for event in llm_client.generate(messages, tools=TOOLS_SCHEMA):
             if event["type"] == "content":
+                if is_rlhf and not rlhf_started:
+                    rlhf_started = True
+                    yield json.dumps({"type": "rlhf_start"})
+                    gen2_task = asyncio.create_task(run_gen2())
+                    
                 assistant_content += event["content"]
                 yield json.dumps({"type": "content", "delta": event["content"]})
+                
+                while not gen2_queue.empty():
+                    alt_delta = gen2_queue.get_nowait()
+                    if alt_delta is not None:
+                        assistant_content_alt += alt_delta
+                        yield json.dumps({"type": "content_alt", "delta": alt_delta})
+                        
             elif event["type"] == "tool_calls":
                 tool_calls = event["tool_calls"]
 
@@ -153,17 +184,18 @@ async def answer_query(
                 )
         else:
             if assistant_content.strip():
-                import random
-                from config import RLHF_PROBABILITY
-                
-                if random.random() < RLHF_PROBABILITY:
-                    yield json.dumps({"type": "rlhf_start"})
-                    
-                    assistant_content_alt = ""
-                    async for event in llm_client.generate(messages, tools=TOOLS_SCHEMA):
-                        if event["type"] == "content":
-                            assistant_content_alt += event["content"]
-                            yield json.dumps({"type": "content_alt", "delta": event["content"]})
+                if rlhf_started:
+                    while True:
+                        try:
+                            alt_delta = gen2_queue.get_nowait()
+                            if alt_delta is None:
+                                break
+                            assistant_content_alt += alt_delta
+                            yield json.dumps({"type": "content_alt", "delta": alt_delta})
+                        except asyncio.QueueEmpty:
+                            if gen2_task and gen2_task.done():
+                                break
+                            await asyncio.sleep(0.05)
                             
                     yield json.dumps({
                         "type": "rlhf_prompt", 

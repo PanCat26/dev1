@@ -54,9 +54,11 @@ export function ChatView() {
           setStreamingContent(prev => prev + (data.delta || ''));
         } else if (data.type === 'content_alt') {
           setStreamingContentAlt(prev => prev + (data.delta || ''));
+        } else if (data.type === 'rlhf_start') {
+          isChoosingRef.current = true;
+          setFeedbackId('pending');
         } else if (data.type === 'rlhf_feedback_id') {
           feedbackIdRef.current = data.id;
-          isChoosingRef.current = true;
           setFeedbackId(data.id);
         } else if (data.type === 'done') {
           setIsGenerating(false);
@@ -192,7 +194,11 @@ export function ChatView() {
                     <div className="rlhf-content">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                     </div>
-                    <button className="button primary" onClick={() => handleChoice(streamingContent, streamingContentAlt)}>
+                    <button 
+                      className="button primary" 
+                      onClick={() => handleChoice(streamingContent, streamingContentAlt)}
+                      disabled={isGenerating || feedbackId === 'pending'}
+                    >
                       Choose Option A
                     </button>
                   </div>
@@ -207,7 +213,7 @@ export function ChatView() {
                     <button 
                       className="button primary" 
                       onClick={() => handleChoice(streamingContentAlt, streamingContent)}
-                      disabled={isGenerating}
+                      disabled={isGenerating || feedbackId === 'pending'}
                     >
                       Choose Option B
                     </button>
