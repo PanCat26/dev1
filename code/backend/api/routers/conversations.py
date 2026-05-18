@@ -115,11 +115,12 @@ def create_message_endpoint(
     return _msg_to_out(msg)
 
 
-def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
+def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> str:
     db = SessionLocal()
     try:
-        create_message(db, conv_id, role, content)
+        msg = create_message(db, conv_id, role, content)
         db.commit()
+        return str(msg.id)
     except Exception:
         db.rollback()
         raise
@@ -234,7 +235,8 @@ async def conversation_websocket(
 
             if full_answer:
                 try:
-                    await run_in_threadpool(_ws_persist_message, conv_id, "assistant", full_answer)
+                    msg_id = await run_in_threadpool(_ws_persist_message, conv_id, "assistant", full_answer)
+                    await _safe_send(json.dumps({"type": "message_id", "id": msg_id}))
                 except Exception as e:
                     await _safe_send(
                         json.dumps({"type": "error", "message": f"Failed to save assistant message: {e}"})

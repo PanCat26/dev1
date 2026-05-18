@@ -62,9 +62,12 @@ class FeedbackCreateIn(BaseModel):
     rejected_response: str
 
 
+from typing import Literal, Optional
+
 class FeedbackUpdateIn(BaseModel):
     chosen_response: str
     rejected_response: str
+    message_id: Optional[uuid.UUID] = None
 
 
 class FeedbackOut(BaseModel):

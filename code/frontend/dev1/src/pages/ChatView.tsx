@@ -22,6 +22,7 @@ export function ChatView() {
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const feedbackIdRef = useRef<string | null>(null);
+  const messageIdRef = useRef<string | null>(null);
   const isChoosingRef = useRef<boolean>(false);
 
   const scrollToBottom = () => {
@@ -60,6 +61,8 @@ export function ChatView() {
         } else if (data.type === 'rlhf_feedback_id') {
           feedbackIdRef.current = data.id;
           setFeedbackId(data.id);
+        } else if (data.type === 'message_id') {
+          messageIdRef.current = data.id;
         } else if (data.type === 'done') {
           setIsGenerating(false);
           if (!isChoosingRef.current) {
@@ -91,7 +94,7 @@ export function ChatView() {
   const handleChoice = async (chosen: string, rejected: string) => {
     if (!feedbackIdRef.current || !id) return;
     try {
-      await api.updateFeedback(id, feedbackIdRef.current, chosen, rejected);
+      await api.updateFeedback(id, feedbackIdRef.current, chosen, rejected, messageIdRef.current || undefined);
       api.getMessages(convId!).then(msgs => {
         setMessages(msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
       });
@@ -99,6 +102,7 @@ export function ChatView() {
       console.error(e);
     } finally {
       feedbackIdRef.current = null;
+      messageIdRef.current = null;
       isChoosingRef.current = false;
       setFeedbackId(null);
       setStreamingContent('');
@@ -117,6 +121,7 @@ export function ChatView() {
     setStreamingContentAlt('');
     setFeedbackId(null);
     feedbackIdRef.current = null;
+    messageIdRef.current = null;
     isChoosingRef.current = false;
 
     // Optimistically add user message to UI

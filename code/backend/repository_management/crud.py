@@ -60,6 +60,12 @@ def create_message(db: Session, conv_id: uuid.UUID, role: str, content: str) -> 
     db.add(db_msg)
     return db_msg
 
+def update_message_content(db: Session, message_id: uuid.UUID, content: str) -> Optional[Message]:
+    db_msg = db.query(Message).filter(Message.id == message_id).first()
+    if db_msg:
+        db_msg.content = content
+    return db_msg
+
 def create_feedback(db: Session, repo_id: uuid.UUID, prompt: str, chosen: Optional[str] = None, rejected: Optional[str] = None) -> RLHFFeedback:
     db_feedback = RLHFFeedback(
         repository_id=repo_id,

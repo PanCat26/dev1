@@ -2,9 +2,8 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
 from database.session import get_db
-from repository_management.crud import get_all_repositories, get_repository, create_feedback, update_feedback
+from repository_management.crud import get_all_repositories, get_repository, create_feedback, update_feedback, update_message_content
 from repository_management.manager import (
     add_repository,
     delete_repository,
@@ -126,6 +125,9 @@ def update_feedback_endpoint(
     )
     if not feedback:
         raise HTTPException(status_code=404, detail=f"Feedback {feedback_id} not found.")
+        
+    if payload.message_id:
+        update_message_content(db, payload.message_id, payload.chosen_response)
     
     db.commit()
     db.refresh(feedback)
