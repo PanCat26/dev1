@@ -187,7 +187,7 @@ export function ChatView() {
                 </div>
               </div>
             )}
-            
+
             {feedbackId && (
               <div className="rlhf-container">
                 <div className="rlhf-header">
@@ -199,8 +199,8 @@ export function ChatView() {
                     <div className="rlhf-content">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                     </div>
-                    <button 
-                      className="button primary" 
+                    <button
+                      className="button primary"
                       onClick={() => handleChoice(streamingContent, streamingContentAlt)}
                       disabled={isGenerating || feedbackId === 'pending'}
                     >
@@ -215,8 +215,8 @@ export function ChatView() {
                         <span className="typing-indicator">Generating alternative...</span>
                       )}
                     </div>
-                    <button 
-                      className="button primary" 
+                    <button
+                      className="button primary"
                       onClick={() => handleChoice(streamingContentAlt, streamingContent)}
                       disabled={isGenerating || feedbackId === 'pending'}
                     >
