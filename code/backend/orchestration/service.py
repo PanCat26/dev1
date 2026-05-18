@@ -153,6 +153,23 @@ async def answer_query(
                 )
         else:
             if assistant_content.strip():
+                import random
+                from config import RLHF_PROBABILITY
+                
+                if random.random() < RLHF_PROBABILITY:
+                    yield json.dumps({"type": "rlhf_start"})
+                    
+                    assistant_content_alt = ""
+                    async for event in llm_client.generate(messages, tools=TOOLS_SCHEMA):
+                        if event["type"] == "content":
+                            assistant_content_alt += event["content"]
+                            yield json.dumps({"type": "content_alt", "delta": event["content"]})
+                            
+                    yield json.dumps({
+                        "type": "rlhf_prompt", 
+                        "prompt": json.dumps(messages)
+                    })
+                    
                 messages.append(assistant_message)
                 return
             yield json.dumps(

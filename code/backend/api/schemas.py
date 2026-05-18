@@ -54,3 +54,23 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+
+
+class FeedbackCreateIn(BaseModel):
+    prompt: str
+    chosen_response: str
+    rejected_response: str
+
+
+class FeedbackUpdateIn(BaseModel):
+    chosen_response: str
+    rejected_response: str
+
+
+class FeedbackOut(BaseModel):
+    id: uuid.UUID
+    repository_id: uuid.UUID
+    prompt: str
+    chosen_response: str
+    rejected_response: str
+    created_at: datetime

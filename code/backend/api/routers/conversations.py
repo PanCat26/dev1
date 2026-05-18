@@ -14,6 +14,7 @@ from repository_management.crud import (
     get_conversations,
     get_messages,
     get_repository,
+    create_feedback,
 )
 from api.schemas import ConversationOut, MessageCreateIn, MessageOut
 from orchestration.history import bounded_history_for_llm
@@ -126,6 +127,19 @@ def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
         db.close()
 
 
+def _ws_persist_rlhf_prompt(repo_id: uuid.UUID, prompt: str) -> str:
+    db = SessionLocal()
+    try:
+        feedback = create_feedback(db, repo_id, prompt)
+        db.commit()
+        return str(feedback.id)
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def _ws_load_repo_context_and_history(
     conv_id: uuid.UUID,
 ) -> tuple[tuple[str, str, str], list[dict[str, str]]] | None:
@@ -206,6 +220,10 @@ async def conversation_websocket(
                         event = json.loads(chunk)
                         if event.get("type") == "content":
                             full_answer += event.get("delta", "") or ""
+                        elif event.get("type") == "rlhf_prompt":
+                            prompt_str = event.get("prompt", "")
+                            feedback_id = await run_in_threadpool(_ws_persist_rlhf_prompt, uuid.UUID(repo_id), prompt_str)
+                            await _safe_send(json.dumps({"type": "rlhf_feedback_id", "id": feedback_id}))
                     except json.JSONDecodeError:
                         pass
             except Exception as e:

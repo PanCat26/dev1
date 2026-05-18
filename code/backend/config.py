@@ -17,3 +17,5 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", None)
 
 LLAMA_SERVER_URL = os.getenv("LLAMA_SERVER_URL", "http://localhost:8080")
 LLAMA_MODEL = os.getenv("LLAMA_MODEL", "qwen2.5-coder-7b-q4_k_m.gguf")
+
+RLHF_PROBABILITY = float(os.getenv("RLHF_PROBABILITY", "0.2"))

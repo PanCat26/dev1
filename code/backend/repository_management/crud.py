@@ -3,6 +3,7 @@ import uuid
 from repository_management.models.repository import Repository
 from repository_management.models.conversation import Conversation
 from repository_management.models.message import Message
+from repository_management.models.feedback import RLHFFeedback
 from typing import List, Optional
 
 def create_repository(db: Session, name: str, github_url: str, default_branch: str, snapshot_path: str, commit_sha: str) -> Repository:
@@ -58,3 +59,20 @@ def create_message(db: Session, conv_id: uuid.UUID, role: str, content: str) -> 
     db_msg = Message(conversation_id=conv_id, role=role, content=content)
     db.add(db_msg)
     return db_msg
+
+def create_feedback(db: Session, repo_id: uuid.UUID, prompt: str, chosen: Optional[str] = None, rejected: Optional[str] = None) -> RLHFFeedback:
+    db_feedback = RLHFFeedback(
+        repository_id=repo_id,
+        prompt=prompt,
+        chosen_response=chosen,
+        rejected_response=rejected
+    )
+    db.add(db_feedback)
+    return db_feedback
+
+def update_feedback(db: Session, feedback_id: uuid.UUID, chosen: str, rejected: str) -> Optional[RLHFFeedback]:
+    db_feedback = db.query(RLHFFeedback).filter(RLHFFeedback.id == feedback_id).first()
+    if db_feedback:
+        db_feedback.chosen_response = chosen
+        db_feedback.rejected_response = rejected
+    return db_feedback

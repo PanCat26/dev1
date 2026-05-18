@@ -86,4 +86,14 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch messages');
     return res.json();
   },
+
+  updateFeedback: async (repo_id: string, feedback_id: string, chosen: string, rejected: string): Promise<any> => {
+    const res = await fetch(`${API_BASE}/repositories/${repo_id}/feedback/${feedback_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chosen_response: chosen, rejected_response: rejected }),
+    });
+    if (!res.ok) throw new Error('Failed to update feedback');
+    return res.json();
+  },
 };
