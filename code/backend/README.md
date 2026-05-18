@@ -76,13 +76,23 @@ DATABASE_URL=postgresql://dev1:dev1@127.0.0.1:5433/dev1db
 GITHUB_TOKEN=<your-github-api-token>
 LLAMA_SERVER_URL=http://localhost:8080
 LLAMA_MODEL=qwen2.5-coder-7b-q4_k_m.gguf
+RLHF_PROBABILITY=0.2
 ```
 
-Most variables have defaults, so `.env` is generally optional for local development. However, `GITHUB_TOKEN` does not have a default value; if it is not provided, you might encounter GitHub API rate limits during repository ingestion.
+### Environment Properties Explained
 
-Override the default for `LLAMA_SERVER_URL` if your llama-server runs on a different port.
+Most variables have defaults, so `.env` is generally optional for local development, with the exception of specific tokens.
 
-Set `LLAMA_MODEL` to a model id your llama-server accepts for `POST /v1/chat/completions` (see `GET <LLAMA_SERVER_URL>/v1/models`, e.g. `http://127.0.0.1:8080/v1/models`). The default in `config.py` is `qwen2.5-coder-7b-q4_k_m.gguf`; change it if your server registers a different id.
+- `QDRANT_URL`: The URL where the Qdrant vector database is hosted. Defaults to local docker container `http://localhost:6333`.
+- `QDRANT_COLLECTION_NAME`: The name of the collection in Qdrant where code snippets will be indexed.
+- `QDRANT_VECTOR_SIZE`: The dimension of the embeddings produced by the embedding model. Must match the model's output size (384 for `all-MiniLM-L6-v2`).
+- `QDRANT_DISTANCE_METRIC`: The distance metric used for similarity search (e.g., `Cosine`, `Dot`, `Euclid`).
+- `EMBEDDING_MODEL_NAME`: The HuggingFace sentence-transformers model used to convert text/code chunks into vector embeddings.
+- `DATABASE_URL`: The PostgreSQL connection string used by SQLAlchemy and Alembic.
+- `GITHUB_TOKEN`: Your GitHub API personal access token. **Required** to avoid strict GitHub API rate limits during repository ingestion.
+- `LLAMA_SERVER_URL`: The URL where your `llama.cpp` server is listening. Override this if your server runs on a different port.
+- `LLAMA_MODEL`: The model identifier that your `llama-server` expects for the `POST /v1/chat/completions` endpoint. (Verify via `GET <LLAMA_SERVER_URL>/v1/models`).
+- `RLHF_PROBABILITY`: A float between `0.0` and `1.0` (default `0.2`) determining how often the backend will trigger a double-generation to collect Reinforcement Learning from Human Feedback (RLHF) data.
 
 ## Start Services (PostgreSQL & Qdrant)
 
