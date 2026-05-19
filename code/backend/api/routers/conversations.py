@@ -14,6 +14,7 @@ from repository_management.crud import (
     get_conversations,
     get_messages,
     get_repository,
+    create_feedback,
 )
 from api.schemas import ConversationOut, MessageCreateIn, MessageOut
 from orchestration.history import bounded_history_for_llm
@@ -114,11 +115,25 @@ def create_message_endpoint(
     return _msg_to_out(msg)
 
 
-def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> None:
+def _ws_persist_message(conv_id: uuid.UUID, role: str, content: str) -> str:
     db = SessionLocal()
     try:
-        create_message(db, conv_id, role, content)
+        msg = create_message(db, conv_id, role, content)
         db.commit()
+        return str(msg.id)
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _ws_persist_rlhf_prompt(repo_id: uuid.UUID, prompt: str) -> str:
+    db = SessionLocal()
+    try:
+        feedback = create_feedback(db, repo_id, prompt)
+        db.commit()
+        return str(feedback.id)
     except Exception:
         db.rollback()
         raise
@@ -206,6 +221,10 @@ async def conversation_websocket(
                         event = json.loads(chunk)
                         if event.get("type") == "content":
                             full_answer += event.get("delta", "") or ""
+                        elif event.get("type") == "rlhf_prompt":
+                            prompt_str = event.get("prompt", "")
+                            feedback_id = await run_in_threadpool(_ws_persist_rlhf_prompt, uuid.UUID(repo_id), prompt_str)
+                            await _safe_send(json.dumps({"type": "rlhf_feedback_id", "id": feedback_id}))
                     except json.JSONDecodeError:
                         pass
             except Exception as e:
@@ -216,7 +235,8 @@ async def conversation_websocket(
 
             if full_answer:
                 try:
-                    await run_in_threadpool(_ws_persist_message, conv_id, "assistant", full_answer)
+                    msg_id = await run_in_threadpool(_ws_persist_message, conv_id, "assistant", full_answer)
+                    await _safe_send(json.dumps({"type": "message_id", "id": msg_id}))
                 except Exception as e:
                     await _safe_send(
                         json.dumps({"type": "error", "message": f"Failed to save assistant message: {e}"})

@@ -2,9 +2,8 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
 from database.session import get_db
-from repository_management.crud import get_all_repositories, get_repository
+from repository_management.crud import get_all_repositories, get_repository, create_feedback, update_feedback, update_message_content
 from repository_management.manager import (
     add_repository,
     delete_repository,
@@ -17,6 +16,9 @@ from api.schemas import (
     RepositoryAddedOut,
     RepositoryOut,
     RepositoryStatusOut,
+    FeedbackCreateIn,
+    FeedbackUpdateIn,
+    FeedbackOut,
 )
 
 router = APIRouter(prefix="/repositories", tags=["repositories"])
@@ -102,3 +104,39 @@ def get_repository_status_endpoint(
     if not repo:
         raise HTTPException(status_code=404, detail=f"Repository {repo_id} not found.")
     return RepositoryStatusOut(id=repo.id, status=repo.status, commit_sha=repo.commit_sha)
+
+
+@router.patch("/{repo_id}/feedback/{feedback_id}", response_model=FeedbackOut)
+def update_feedback_endpoint(
+    repo_id: uuid.UUID,
+    feedback_id: uuid.UUID,
+    payload: FeedbackUpdateIn,
+    db: Session = Depends(get_db),
+):
+    repo = get_repository(db, repo_id)
+    if not repo:
+        raise HTTPException(status_code=404, detail=f"Repository {repo_id} not found.")
+        
+    feedback = update_feedback(
+        db=db,
+        feedback_id=feedback_id,
+        chosen=payload.chosen_response,
+        rejected=payload.rejected_response
+    )
+    if not feedback:
+        raise HTTPException(status_code=404, detail=f"Feedback {feedback_id} not found.")
+        
+    if payload.message_id:
+        update_message_content(db, payload.message_id, payload.chosen_response)
+    
+    db.commit()
+    db.refresh(feedback)
+    
+    return FeedbackOut(
+        id=feedback.id,
+        repository_id=feedback.repository_id,
+        prompt=feedback.prompt,
+        chosen_response=feedback.chosen_response,
+        rejected_response=feedback.rejected_response,
+        created_at=feedback.created_at
+    )

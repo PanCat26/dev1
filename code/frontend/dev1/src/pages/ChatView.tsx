@@ -16,9 +16,14 @@ export function ChatView() {
   // Streaming state
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
+  const [streamingContentAlt, setStreamingContentAlt] = useState('');
+  const [feedbackId, setFeedbackId] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const feedbackIdRef = useRef<string | null>(null);
+  const messageIdRef = useRef<string | null>(null);
+  const isChoosingRef = useRef<boolean>(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,13 +53,25 @@ export function ChatView() {
         const data = JSON.parse(event.data);
         if (data.type === 'content') {
           setStreamingContent(prev => prev + (data.delta || ''));
+        } else if (data.type === 'content_alt') {
+          setStreamingContentAlt(prev => prev + (data.delta || ''));
+        } else if (data.type === 'rlhf_start') {
+          isChoosingRef.current = true;
+          setFeedbackId('pending');
+        } else if (data.type === 'rlhf_feedback_id') {
+          feedbackIdRef.current = data.id;
+          setFeedbackId(data.id);
+        } else if (data.type === 'message_id') {
+          messageIdRef.current = data.id;
         } else if (data.type === 'done') {
           setIsGenerating(false);
-          // Reload messages from server to get the final persisted versions
-          api.getMessages(convId).then(msgs => {
-            setMessages(msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
-            setStreamingContent('');
-          });
+          if (!isChoosingRef.current) {
+            api.getMessages(convId).then(msgs => {
+              setMessages(msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+              setStreamingContent('');
+              setStreamingContentAlt('');
+            });
+          }
         } else if (data.type === 'error') {
           console.error('WS Error:', data.message);
           setIsGenerating(false);
@@ -74,14 +91,38 @@ export function ChatView() {
     };
   }, [convId]);
 
+  const handleChoice = async (chosen: string, rejected: string) => {
+    if (!feedbackIdRef.current || !id) return;
+    try {
+      await api.updateFeedback(id, feedbackIdRef.current, chosen, rejected, messageIdRef.current || undefined);
+      api.getMessages(convId!).then(msgs => {
+        setMessages(msgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()));
+      });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      feedbackIdRef.current = null;
+      messageIdRef.current = null;
+      isChoosingRef.current = false;
+      setFeedbackId(null);
+      setStreamingContent('');
+      setStreamingContentAlt('');
+    }
+  };
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isGenerating) return;
+    if (!input.trim() || isGenerating || feedbackId) return;
 
     const messageText = input;
     setInput('');
     setIsGenerating(true);
     setStreamingContent('');
+    setStreamingContentAlt('');
+    setFeedbackId(null);
+    feedbackIdRef.current = null;
+    messageIdRef.current = null;
+    isChoosingRef.current = false;
 
     // Optimistically add user message to UI
     const tempUserMsg: MessageOut = {
@@ -132,7 +173,7 @@ export function ChatView() {
               </div>
             ))}
 
-            {isGenerating && (
+            {isGenerating && !feedbackId && (
               <div className="message-wrapper assistant">
                 <div className="message-avatar">
                   <Bot size={20} />
@@ -143,6 +184,45 @@ export function ChatView() {
                   ) : (
                     <span className="typing-indicator">Thinking...</span>
                   )}
+                </div>
+              </div>
+            )}
+
+            {feedbackId && (
+              <div className="rlhf-container">
+                <div className="rlhf-header">
+                  <Bot size={20} />
+                  <span>Please choose the best response</span>
+                </div>
+                <div className="rlhf-choices">
+                  <div className="rlhf-choice glass-panel">
+                    <div className="rlhf-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
+                    </div>
+                    <button
+                      className="button primary"
+                      onClick={() => handleChoice(streamingContent, streamingContentAlt)}
+                      disabled={isGenerating || feedbackId === 'pending'}
+                    >
+                      Choose Option A
+                    </button>
+                  </div>
+                  <div className="rlhf-choice glass-panel">
+                    <div className="rlhf-content">
+                      {streamingContentAlt ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContentAlt}</ReactMarkdown>
+                      ) : (
+                        <span className="typing-indicator">Generating alternative...</span>
+                      )}
+                    </div>
+                    <button
+                      className="button primary"
+                      onClick={() => handleChoice(streamingContentAlt, streamingContent)}
+                      disabled={isGenerating || feedbackId === 'pending'}
+                    >
+                      Choose Option B
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -159,13 +239,13 @@ export function ChatView() {
             placeholder="Type your message..."
             value={input}
             onChange={e => setInput(e.target.value)}
-            disabled={isGenerating}
+            disabled={isGenerating || feedbackId !== null}
             autoFocus
           />
           <button
             type="submit"
             className="button primary send-button"
-            disabled={!input.trim() || isGenerating}
+            disabled={!input.trim() || isGenerating || feedbackId !== null}
           >
             {isGenerating ? <Loader2 className="spinner" size={18} /> : <Send size={18} />}
           </button>

@@ -54,3 +54,26 @@ class MessageOut(BaseModel):
     role: str
     content: str
     created_at: datetime
+
+
+class FeedbackCreateIn(BaseModel):
+    prompt: str
+    chosen_response: str
+    rejected_response: str
+
+
+from typing import Literal, Optional
+
+class FeedbackUpdateIn(BaseModel):
+    chosen_response: str
+    rejected_response: str
+    message_id: Optional[uuid.UUID] = None
+
+
+class FeedbackOut(BaseModel):
+    id: uuid.UUID
+    repository_id: uuid.UUID
+    prompt: str
+    chosen_response: str
+    rejected_response: str
+    created_at: datetime
