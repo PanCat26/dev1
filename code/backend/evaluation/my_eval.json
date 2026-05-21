@@ -1,0 +1,24 @@
+[
+  {
+    "name": "Task-Management",
+    "repo_id": "3f27fa80-fb93-4505-b57d-8d120f187c82",
+    "commit_sha": "afe88ed31b2999d9655a3a90becb9249bca35cd4",
+    "snapshot_path": "storage/snapshots/Task-Management_3f27fa80",
+    "questions": [
+      "How are activities represented in the project?",
+      "Where is the graph constructed?",
+      "How is the critical path calculated?"
+    ]
+  },
+  {
+    "name": "Tetris-Game",
+    "repo_id": "ae028ffa-e679-4289-aba7-b439381af3c2",
+    "commit_sha": "daefce32d4e495f477ba3928b62a7a72fa8ec0e4",
+    "snapshot_path": "storage/snapshots/Tetris-Game_ae028ffa",
+    "questions": [
+      "What are the main components of this repository?",
+      "Where is the main application flow implemented?",
+      "How does this repository process input data?"
+    ]
+  }
+]

@@ -3,7 +3,40 @@ from retrieval.embeddings import embed_query
 from retrieval.search import search_chunks
 from retrieval.ranking import rank_chunks
 from retrieval.evidence import build_evidence_package
-from retrieval.types import EvidencePackage
+from retrieval.types import EvidencePackage, RetrievedChunk
+
+
+def retrieve_ranked_chunks(
+    query: str,
+    repo_id: str,
+    commit_sha: str | None = None,
+    num_candidates: int = 20,
+) -> list[RetrievedChunk]:
+    """Run retrieval through embedding → Qdrant search → rerank (no evidence grouping).
+
+    The evidence package reorganizes chunks by role and truncates groups, which is not the
+    same ordering as Recall@k / Top-1 over the global ranked list produced here.
+    """
+
+    query = query.strip()
+    if not query:
+        raise ValueError("query must not be empty")
+    repo_id = repo_id.strip()
+    if not repo_id:
+        raise ValueError("repo_id must not be empty")
+
+    query_vector = embed_query(query)
+    client = get_qdrant_client()
+    chunks = search_chunks(
+        client=client,
+        query_vector=query_vector,
+        repo_id=repo_id,
+        commit_sha=commit_sha,
+        limit=num_candidates,
+    )
+    if not chunks:
+        return []
+    return rank_chunks(chunks, query)
 
 
 def retrieve_for_query(
@@ -36,44 +69,25 @@ def retrieve_for_query(
         ValueError: If query or repo_id are empty.
         Exception: If Qdrant connection fails or retrieval has issues.
     """
-    # Validate required inputs
-    query = query.strip()
-    if not query:
-        raise ValueError("query must not be empty")
-    repo_id = repo_id.strip()
-    if not repo_id:
-        raise ValueError("repo_id must not be empty")
-    
-    # Step 1: Embed the query
-    query_vector = embed_query(query)
-    
-    # Step 2: Search Qdrant
-    client = get_qdrant_client()
-    chunks = search_chunks(
-        client=client,
-        query_vector=query_vector,
+    ranked_chunks = retrieve_ranked_chunks(
+        query=query,
         repo_id=repo_id,
         commit_sha=commit_sha,
-        limit=num_candidates,
+        num_candidates=num_candidates,
     )
-    
-    if not chunks:
+    if not ranked_chunks:
         return EvidencePackage(
-            repo_id=repo_id,
+            repo_id=repo_id.strip(),
             commit_sha=commit_sha,
-            query=query,
+            query=query.strip(),
             groups=[],
             total_chunks=0,
         )
-    
-    # Step 3: Rerank using metadata signals
-    ranked_chunks = rank_chunks(chunks, query)
-    
-    # Step 4: Group by role and build evidence package
+
     return build_evidence_package(
         chunks=ranked_chunks,
-        query=query,
-        repo_id=repo_id,
+        query=query.strip(),
+        repo_id=repo_id.strip(),
         commit_sha=commit_sha,
         max_chunks_per_category_in_group=max_chunks_per_category_in_package,
     )
