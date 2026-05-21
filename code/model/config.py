@@ -14,6 +14,12 @@ SFT_DATASET = "nvidia/OpenCodeInstruct"
 DEFAULT_OUTPUT_DIR = "outputs"
 DEFAULT_SFT_OUTPUT = os.path.join(DEFAULT_OUTPUT_DIR, "sft")
 DEFAULT_MERGED_OUTPUT = os.path.join(DEFAULT_OUTPUT_DIR, "merged")
+DEFAULT_DPO_OUTPUT = os.path.join(DEFAULT_OUTPUT_DIR, "dpo")
+DEFAULT_DPO_MERGED_OUTPUT = os.path.join(DEFAULT_OUTPUT_DIR, "merged_dpo")
+
+DPO_DATASET_PATH = os.getenv("DPO_DATASET_PATH")
+DPO_ADAPTER_REPO = os.getenv("DPO_ADAPTER_REPO")
+SFT_MERGED_MODEL_PATH = os.getenv("SFT_MERGED_MODEL_PATH", DEFAULT_MERGED_OUTPUT)
 
 
 @dataclass
@@ -67,3 +73,29 @@ class SFTRunConfig:
     optim: str = "paged_adamw_8bit"
     report_to: str = "none"
     max_train_samples: Optional[int] = 50000
+
+
+@dataclass
+class DPORunConfig:
+    """Training arguments for Direct Preference Optimization."""
+
+    num_train_epochs: int = 3
+    per_device_train_batch_size: int = 1
+    gradient_accumulation_steps: int = 8
+    learning_rate: float = 5e-5
+    lr_scheduler_type: str = "cosine"
+    warmup_ratio: float = 0.1
+    beta: float = 0.1
+    max_length: int = 4096
+    max_prompt_length: int = 3072
+    fp16: bool = False
+    bf16: bool = True
+    logging_steps: int = 10
+    save_steps: int = 200
+    save_total_limit: int = 3
+    seed: int = 42
+    output_dir: str = DEFAULT_DPO_OUTPUT
+    gradient_checkpointing: bool = True
+    optim: str = "paged_adamw_8bit"
+    report_to: str = "none"
+    max_train_samples: Optional[int] = None
