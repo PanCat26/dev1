@@ -126,6 +126,100 @@ python merge_adapter.py
 
 Important: make sure you have enough free disk space before running this step, as the merged model is much larger than the adapter.
 
+## DPO preference fine-tuning (optional)
+
+You can further fine-tune the SFT-merged model with Direct Preference Optimization (DPO) using pairwise feedback collected from the backend's `rlhf_feedback` table. This produces a separate `dpo_adapter` that sits on top of the SFT-merged base.
+
+Prerequisites:
+
+- The SFT-merged model must already exist at `outputs/merged` (see section [5](#5-merge-the-base-model-with-the-adapter)).
+- The backend Postgres database must be running with collected feedback rows in `rlhf_feedback`.
+
+### A. Export preference data from Postgres
+
+This step runs from the backend folder (not `code/model`), since it depends on the backend's database session.
+
+#### Windows
+
+```powershell
+cd code\backend
+.\.venv\Scripts\Activate.ps1
+python scripts/export_preferences.py
+```
+
+#### Linux / macOS
+
+```bash
+cd code/backend
+source .venv/bin/activate
+python scripts/export_preferences.py
+```
+
+By default this writes `code/backend/storage/preferences/dpo_<UTC-timestamp>.jsonl`. Override with `--out <path>` or cap with `--limit N`.
+
+The exporter skips rows with NULL or identical responses, and rows where either response is shorter than 10 characters.
+
+### B. Set DPO environment variables
+
+Add to `code/model/.env`:
+
+```env
+DPO_DATASET_PATH=<absolute-or-relative-path-to-the-exported-jsonl>
+```
+
+Optional overrides:
+
+- `SFT_MERGED_MODEL_PATH` - defaults to `outputs/merged` (the section [5](#5-merge-the-base-model-with-the-adapter) output). Override only if the merged base lives elsewhere.
+- `DPO_ADAPTER_REPO` - used by `merge_dpo_adapter.py` in step D.
+
+### C. Train
+
+#### Windows
+
+```powershell
+cd code\model
+.\.venv\Scripts\Activate.ps1
+python train_dpo.py
+```
+
+#### Linux / macOS
+
+```bash
+cd code/model
+source .venv/bin/activate
+python train_dpo.py
+```
+
+The DPO adapter is saved locally to:
+
+```text
+outputs/dpo/final_adapter
+```
+
+### D. Merge the DPO adapter (optional, for serving)
+
+To produce a single deployable model that bakes in both SFT and DPO, merge the DPO adapter into the SFT-merged base. Set `DPO_ADAPTER_REPO` in `code/model/.env` (local path or Hugging Face repo id), then:
+
+#### Windows
+
+```powershell
+python merge_dpo_adapter.py
+```
+
+#### Linux / macOS
+
+```bash
+python merge_dpo_adapter.py
+```
+
+The fully-merged model is placed in:
+
+```text
+outputs/merged_dpo
+```
+
+From here you can resume the standard pipeline at section [6.3](#63-convert-the-merged-model-to-gguf), pointing the GGUF converter at `outputs/merged_dpo` instead of `outputs/merged`.
+
 ## 6. Convert to GGUF and quantize
 
 ### 6.1 Get `llama.cpp`
